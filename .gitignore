@@ -32,4 +32,7 @@ results/metrics/*
 !results/metrics/.gitkeep
 results/saved_models/*
 !results/saved_models/.gitkeep
-docs/
+docs/*
+!docs/Practice Exercise 3.pdf
+!docs/description_working_with_AI/
+!docs/Algrothirms/
