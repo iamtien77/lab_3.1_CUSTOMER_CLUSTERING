@@ -5,7 +5,7 @@ Trạng thái: khung báo cáo, chưa có kết quả thực nghiệm.
 ## 1. Dữ liệu và khám phá (EDA)
 
 Điền nguồn, số mẫu, các thuộc tính, missing values, outliers và phân phối.
-Chèn liên kết tới hình trong ../results/figures/ và giải thích quan sát.
+Chèn liên kết tới hình trong ../../results/figures/ và giải thích quan sát.
 
 ## 2. Tiền xử lý và chuẩn hóa
 
@@ -15,7 +15,7 @@ Nếu chia tập dữ liệu, nêu mục đích, tỷ lệ và cách tránh rò 
 ## 3. Thuật toán và thử nghiệm tham số
 
 Ghi thuật toán, tập đặc trưng, scaler, tham số đã thử và seed nếu có.
-Liên kết bảng kết quả trong ../results/metrics/. Chưa kết luận trước số cụm.
+Liên kết bảng kết quả trong ../../results/metrics/. Chưa kết luận trước số cụm.
 
 ## 4. Đánh giá và trực quan hóa
 

@@ -36,4 +36,5 @@ docs/*
 !docs/Practice Exercise 3.pdf
 !docs/description_working_with_AI/
 !docs/Algrothirms/
+!docs/reports/
 data/*

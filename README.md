@@ -20,6 +20,8 @@ lab_3.1_CUSTOMER_CLUSTERING/
 ├── docs/
 │   ├── Algrothirms/                 # Thư mục tài liệu thuật toán
 │   ├── description_working_with_AI/ # Thư mục tài liệu làm việc với AI
+│   ├── reports/
+│   │   └── report.md               # Khung báo cáo phân tích và kết luận
 │   └── Practice Exercise 3.pdf      # Đề bài gốc
 ├── notebooks/                      # Sổ tay Jupyter theo bốn bước của đề
 │   ├── 01_eda.ipynb
@@ -30,8 +32,6 @@ lab_3.1_CUSTOMER_CLUSTERING/
 │   ├── figures/                    # Biểu đồ trực quan
 │   ├── metrics/                    # Tham số thử nghiệm và bảng đánh giá
 │   └── saved_models/               # Mô hình đã lưu (mở rộng)
-├── reports/
-│   └── report.md                   # Khung báo cáo phân tích và kết luận
 ├── src/                            # Khung mã nguồn module hóa
 │   ├── __init__.py
 │   ├── config.py                   # Đường dẫn, tham số và cấu hình hiển thị
@@ -73,7 +73,7 @@ lab_3.1_CUSTOMER_CLUSTERING/
 └── requirements.txt
 ```
 
-`results/` dành cho đầu ra được sinh từ chương trình; `reports/` dành cho phần giải thích và nhận xét. Tài liệu trong `docs/LAB3_CUSTOMER_CLUSTERING/` dùng để tham khảo, không đại diện cho kết quả của pipeline hiện tại.
+`results/` dành cho đầu ra được sinh từ chương trình; `docs/reports/` dành cho phần giải thích và nhận xét. Tài liệu trong `docs/LAB3_CUSTOMER_CLUSTERING/` dùng để tham khảo, không đại diện cho kết quả của pipeline hiện tại.
 
 Xem [bảng đối chiếu yêu cầu](docs/requirements_mapping.md) để biết trách nhiệm từng phần.
 
@@ -143,7 +143,7 @@ Với DBSCAN, cần ghi số cụm, tỷ lệ noise và cách xử lý noise khi
 
 **Mô tả nhóm khách hàng:** thống kê tuổi, thu nhập và điểm chi tiêu theo cụm, sau đó diễn giải đặc điểm từng nhóm. Persona và gợi ý marketing là phần mở rộng, cần căn cứ vào dữ liệu; không ấn định trước năm nhóm khách hàng.
 
-**Nơi thực hiện:** `notebooks/04_evaluation_and_profiling.ipynb` và `src/evaluation/`. Tổng hợp nhận xét trong [báo cáo](reports/report.md).
+**Nơi thực hiện:** `notebooks/04_evaluation_and_profiling.ipynb` và `src/evaluation/`. Tổng hợp nhận xét trong [báo cáo](docs/reports/report.md).
 
 ---
 
@@ -189,7 +189,7 @@ Kết quả dự kiến được tổ chức tại:
 
 - `results/figures/`: biểu đồ phân tích và phân cụm.
 - `results/metrics/`: bảng tham số, điểm đánh giá và thống kê phân khúc.
-- `reports/report.md`: báo cáo nhận xét và kết luận.
+- `docs/reports/report.md`: báo cáo nhận xét và kết luận.
 - `results/saved_models/`: mô hình đã lưu nếu triển khai phần mở rộng.
 
 Lưu mô hình, dự đoán khách hàng mới và các chức năng trong `src/deployment/` không thuộc yêu cầu bắt buộc của đề. Các gợi ý cũ trong khung code như chọn sẵn K-Means, $K=5$ hoặc năm persona cần được kiểm chứng khi triển khai.
