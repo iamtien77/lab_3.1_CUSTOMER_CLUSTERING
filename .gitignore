@@ -38,3 +38,5 @@ docs/*
 !docs/Algrothirms/
 !docs/reports/
 data/*
+scripts/*
+.github/*
