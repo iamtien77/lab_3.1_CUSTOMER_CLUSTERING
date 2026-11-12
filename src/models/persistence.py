@@ -3,15 +3,16 @@
 MODULE: LƯU TRỮ VÀ TẢI MÔ HÌNH (MODEL PERSISTENCE)
 =============================================================================
 Mục đích:
-- Đóng gói toàn bộ mô hình (Preprocessor Scaler + Mô hình Phân Cụm + Metadata)
-  bằng thư viện joblib vào thư mục results/saved_models/.
-- Hỗ trợ nạp lại mô hình đã huấn luyện để phục vụ dự đoán và suy luận thời gian thực.
+- Đóng gói toàn bộ pipeline (Mô hình phân cụm + Scaler + Metadata) bằng joblib
+  vào thư mục results/saved_models/.
+- Nạp lại gói mô hình để phục vụ suy luận trên tập Test hoặc khách hàng mới.
 =============================================================================
 """
 
 from pathlib import Path
 from typing import Any, Dict, Optional
 import joblib
+
 from src.config import SAVED_MODELS_DIR
 
 
@@ -20,25 +21,40 @@ def save_model(
     scaler_object: Any,
     model_name: str = "final_kmeans_pipeline.pkl",
     metadata: Optional[Dict[str, Any]] = None,
+    output_dir: Optional[Path | str] = None,
 ) -> Path:
     """
-    Ý LÀM:
-    1. Đóng gói một Dictionary hoàn chỉnh gồm:
-       - 'model': Mô hình phân cụm đã fit (KMeans, DBSCAN, ...).
-       - 'scaler': Bộ chuẩn hóa dữ liệu đã fit (FeatureScaler).
-       - 'metadata': Thông tin cấu hình (tên đặc trưng, số cụm, ngày tạo, chỉ số đánh giá).
-    2. Xác định đường dẫn file lưu: results/saved_models/{model_name}.
-    3. Dùng joblib.dump() để ghi đối tượng xuống đĩa.
-    4. Trả về đường dẫn Path tới file đã lưu.
+    Đóng gói model, scaler và metadata thành file .pkl bằng joblib.
     """
-    pass
+    thu_muc = Path(output_dir) if output_dir is not None else SAVED_MODELS_DIR
+    thu_muc.mkdir(parents=True, exist_ok=True)
+    duong_dan = thu_muc / model_name
+
+    goi_mo_hinh = {
+        "model": model_object,
+        "scaler": scaler_object,
+        "metadata": metadata or {},
+    }
+    joblib.dump(goi_mo_hinh, duong_dan)
+    print(f" [ĐÃ LƯU MÔ HÌNH] Gói pipeline phân cụm đã lưu tại: {duong_dan}")
+    return duong_dan
 
 
-def load_model(model_name: str = "final_kmeans_pipeline.pkl") -> Dict[str, Any]:
+def load_model(
+    model_name: str = "final_kmeans_pipeline.pkl",
+    input_dir: Optional[Path | str] = None,
+) -> Dict[str, Any]:
     """
-    Ý LÀM:
-    1. Kiểm tra sự tồn tại của file mô hình trong thư mục results/saved_models/.
-    2. Dùng joblib.load() để giải nén và nạp gói mô hình vào bộ nhớ.
-    3. Trả về dictionary chứa 'model', 'scaler', 'metadata' sẵn sàng cho việc suy luận.
+    Kiểm tra sự tồn tại và nạp gói mô hình ('model', 'scaler', 'metadata') từ ổ đĩa.
     """
-    pass
+    thu_muc = Path(input_dir) if input_dir is not None else SAVED_MODELS_DIR
+    duong_dan = thu_muc / model_name
+    if not duong_dan.exists():
+        raise FileNotFoundError(f"Không tìm thấy tệp mô hình đã lưu tại: {duong_dan}")
+
+    goi_mo_hinh = joblib.load(duong_dan)
+    if not isinstance(goi_mo_hinh, dict) or not {"model", "scaler", "metadata"}.issubset(goi_mo_hinh.keys()):
+        raise ValueError(f"Tệp '{duong_dan}' không đúng cấu trúc gói pipeline mong đợi.")
+
+    print(f" [ĐÃ NẠP MÔ HÌNH] Tải thành công gói pipeline từ: {duong_dan.name}")
+    return goi_mo_hinh
