@@ -38,5 +38,7 @@ docs/*
 !docs/Algrothirms/
 !docs/reports/
 data/*
+data/raw/*
+!data/raw/
 scripts/*
 .github/*
