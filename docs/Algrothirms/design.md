@@ -181,7 +181,7 @@
 - Nhóm tách dữ liệu gốc trong `data/raw/` khỏi dữ liệu chuẩn bị trong `data/processed/`.
 - Nhóm tổ chức notebook theo bốn bước: EDA, chuẩn hóa, phân cụm và đánh giá.
 - Nhóm chia `src/` theo nhiệm vụ: `data/`, `features/`, `models/`, `evaluation/`, `utils/`.
-- Nhóm dành `results/` cho lưu trữ đầu ra dự kiến và `docs/reports/` cho phần diễn giải; `tests/` phục vụ kiểm tra.
+- Nhóm dành `results/` cho lưu trữ đầu ra, `docs/reports/` cho báo cáo tổng hợp; `tests/` phục vụ kiểm tra.
 - Nhóm giữ phạm vi vừa sức; `src/deployment/` và `results/saved_models/` dành cho phần mở rộng.
   Nhóm dùng các tên và vị trí dưới đây; cây lược bớt tệp hỗ trợ, tài liệu phụ và cấu hình môi trường.
 
@@ -191,7 +191,7 @@ lab_3.1_CUSTOMER_CLUSTERING/
 ├── docs/
 │   ├── Practice Exercise 3.pdf              # Yêu cầu bài lab
 │   ├── Algrothirms/                         # design.md: thiết kế của nhóm
-│   └── reports/                                 # report.md: phần trình bày
+│   └── requirements_mapping.md                  # Đối chiếu yêu cầu với triển khai
 ├── notebooks/
 │   ├── 01_eda.ipynb
 │   ├── 02_preprocessing_and_scaling.ipynb

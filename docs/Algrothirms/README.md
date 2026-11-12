@@ -53,5 +53,5 @@ Các quy ước thiết kế đã được nhóm thống nhất cho bài lab:
 - Nhóm thực hiện chuẩn hóa, kiểm chứng điều kiện sau scaling và đối chiếu các scaler trong `notebooks/02_preprocessing_and_scaling.ipynb`.
 - Nhóm thử nghiệm K-Means baseline và các thuật toán đối chiếu trong `notebooks/03_clustering_models.ipynb`.
 - Nhóm đánh giá tổng hợp, vẽ biểu đồ phân tích, mô tả chân dung nhóm khách hàng và thử suy luận mẫu trong `notebooks/04_evaluation_and_profiling.ipynb`.
-- Nhóm dự kiến lưu biểu đồ tại `results/figures/`, bảng chỉ số tại `results/metrics/` và phần trình bày tại `docs/reports/report.md`.
+- Nhóm lưu biểu đồ tại `results/figures/`, bảng chỉ số tại `results/metrics/`, báo cáo tổng hợp tại `README.md` và đối chiếu yêu cầu tại `docs/requirements_mapping.md`.
 - Nhóm ưu tiên làm rõ baseline K-Means trước rồi mới đối chiếu sang các phương pháp còn lại.

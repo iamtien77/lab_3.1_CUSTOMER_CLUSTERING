@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Báo cáo bài lab – Phân cụm khách hàng (Customer Clustering)</title>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  }
+};
+</script>
+<style>
+:root {
+  color-scheme: light;
+  --ink: #1f2d3d;
+  --muted: #52637a;
+  --accent: #1e5966;
+  --accent-light: #eaf2f5;
+  --line: #d1dde5;
+  --soft: #f4f8fa;
+  --card-bg: #ffffff;
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: 20px; }
+body {
+  margin: 0;
+  background: #e9eff2;
+  color: var(--ink);
+  font: 16px/1.75 "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+}
+.paper {
+  max-width: 1140px;
+  margin: 28px auto;
+  padding: 48px 56px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+}
+header {
+  border-bottom: 3px solid var(--accent);
+  padding-bottom: 25px;
+}
+.eyebrow {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+h1 {
+  font-size: 2.2rem;
+  line-height: 1.25;
+  margin: 10px 0 16px;
+  color: #143540;
+}
+h2 {
+  font-size: 1.45rem;
+  line-height: 1.4;
+  margin: 40px 0 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+  color: #1a4350;
+}
+h3 {
+  font-size: 1.15rem;
+  margin: 26px 0 10px;
+  color: var(--accent);
+}
+h4 {
+  font-size: 1.02rem;
+  margin: 18px 0 8px;
+  color: #204c59;
+}
+p { margin: 0 0 14px; }
+li { margin-bottom: 8px; }
+ul, ol { padding-left: 24px; }
+.subtitle {
+  font-size: 1.15rem;
+  color: var(--muted);
+  font-weight: 400;
+  margin-bottom: 16px;
+}
+.source, figcaption, footer {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+a {
+  color: #125e8a;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+nav {
+  padding: 18px 24px 20px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin: 28px 0;
+}
+nav h2 {
+  margin-top: 0;
+  font-size: 1.15rem;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+nav ol {
+  columns: 2;
+  column-gap: 36px;
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+nav li {
+  break-inside: avoid;
+  margin-bottom: 6px;
+}
+.note, .qa {
+  background: #f1f6f8;
+  border-left: 4px solid var(--accent);
+  padding: 16px 20px;
+  margin: 22px 0;
+  border-radius: 0 6px 6px 0;
+}
+.qa p { margin: 8px 0 0; }
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0;
+}
+.meta span {
+  background: var(--soft);
+  padding: 6px 12px;
+  font-size: 0.86rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 20px 0;
+}
+.flow span {
+  padding: 10px 14px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.92rem;
+  text-align: center;
+}
+.flow b {
+  color: var(--accent);
+  font-size: 1.2rem;
+}
+code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.9em;
+  background: #edf2f5;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+pre {
+  padding: 16px 20px;
+  background: #edf2f5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+pre code {
+  padding: 0;
+  background: transparent;
+}
+.formula {
+  background: #faf9f5;
+  border: 1px solid #e8e2d5;
+  border-left: 4px solid #bfa15f;
+  padding: 16px 22px;
+  margin: 20px 0;
+  border-radius: 0 6px 6px 0;
+  line-height: 1.9;
+}
+.table-wrap {
+  overflow-x: auto;
+  margin: 20px 0;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  margin: 18px 0;
+}
+.table-wrap table { margin: 0; }
+caption {
+  text-align: left;
+  font-weight: 600;
+  padding-bottom: 8px;
+  color: var(--muted);
+}
+th, td {
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+thead th {
+  background: #e9f0f3;
+  color: #173b47;
+  font-weight: 600;
+}
+tbody tr:nth-child(even) {
+  background: #fbfdfe;
+}
+.matrix td {
+  text-align: center;
+}
+.fig-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 24px 0;
+}
+figure {
+  margin: 26px 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px;
+  background: #fafcff;
+}
+.fig-grid figure {
+  margin: 0;
+}
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: auto;
+  border-radius: 4px;
+}
+figcaption {
+  padding-top: 10px;
+  text-align: center;
+}
+footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+@media (max-width: 768px) {
+  body { font-size: 15px; }
+  .paper { margin: 0; padding: 24px 18px; border: 0; border-radius: 0; }
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.3rem; }
+  nav ol { columns: 1; }
+  .fig-grid { grid-template-columns: 1fr; }
+  .flow { gap: 8px; }
+  .flow span { width: auto; max-width: none; font-size: 0.85rem; padding: 8px 10px; }
+  th, td { padding: 7px; }
+  table { font-size: 0.8rem; }
+}
+
+@media print {
+  @page { size: A4; margin: 16mm 14mm; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body { background: #fff; font-size: 10pt; line-height: 1.5; color: #000; }
+  .paper { max-width: none; margin: 0; padding: 0; border: 0; box-shadow: none; }
+  h1 { font-size: 20pt; }
+  h2 { font-size: 14pt; page-break-after: avoid; }
+  h3 { font-size: 11pt; page-break-after: avoid; }
+  h1, h2, h3, caption { break-after: avoid; }
+  tr, figure, .qa, .formula, .note { break-inside: avoid; }
+  thead { display: table-header-group; }
+  table { font-size: 8.5pt; }
+  th, td { padding: 5px 8px; }
+  pre { font-size: 8pt; }
+  a { color: inherit; text-decoration: none; }
+  img { max-height: 160mm; object-fit: contain; }
+  nav { display: none; }
+  .flow { display: flex !important; flex-wrap: wrap !important; gap: 6px 8px !important; align-items: center !important; margin: 12px 0 !important; page-break-inside: avoid; break-inside: avoid; }
+  .flow span { display: inline-block !important; width: auto !important; max-width: none !important; padding: 6px 10px !important; font-size: 8.5pt !important; border: 1px solid #c8d3d9 !important; background: #f4f8fa !important; border-radius: 4px !important; text-align: center !important; }
+  .flow b { display: inline-block !important; color: #1e5966 !important; font-size: 9.5pt !important; margin: 0 2px !important; }
+  .note, .qa { background: #f1f6f8 !important; border-left: 4px solid #1e5966 !important; }
+  .formula { background: #faf9f5 !important; border: 1px solid #e8e2d5 !important; border-left: 4px solid #bfa15f !important; }
+}
+</style>
+</head>
+<body>
+<div class="paper">
+
+<header>
+  <p class="eyebrow">Bài thực hành môn Học máy – Practice Exercise 3</p>
+  <h1>Phân cụm khách hàng (Customer Clustering)</h1>
+  <p class="subtitle">Báo cáo thực hành chi tiết: Thiết kế chương trình, chuẩn hóa đặc trưng, đối chiếu bốn thuật toán phân cụm và phân tích chân dung phân khúc</p>
+  <p>Bài thực hành xây dựng một chương trình Python hoàn chỉnh cho bài toán học không giám sát <strong>phân cụm khách hàng bán lẻ (Retail Customer Segmentation)</strong> trên bộ dữ liệu thực tế <code>marketing_campaign.csv</code>. Trọng tâm của bài lab là kiểm tra và làm sạch dữ liệu có kiểm soát, chia tách tập Train/Holdout Test trước khi điền khuyết và chuẩn hóa để tránh rò rỉ dữ liệu, khảo sát bốn hướng thuật toán phổ biến (K-Means, Hierarchical Clustering, DBSCAN, K-Medoids), đánh giá định lượng qua các chỉ số nội tại và rút ra hồ sơ khách hàng phục vụ gợi ý tiếp thị ở quy mô học tập.</p>
+  <div class="note">
+    <strong>Ghi chú phương pháp &amp; phạm vi bài lab:</strong> Mọi bảng biểu, thông số và nhận xét trong báo cáo này được đối chiếu trực tiếp từ mã nguồn thực thi (<code>main.py</code>, các module trong <code>src/</code>) và tệp kết quả xuất ra tại <code>results/metrics/</code> cùng biểu đồ trong <code>results/figures/</code>. Các nhận định đều bám sát mạch: <em>Đầu vào &rarr; Lý do thiết kế &rarr; Công thức / Biến đổi &rarr; Kết quả thực tế &rarr; Giới hạn chứng cứ</em>, giữ đúng phạm vi một bài lab học tập chứ không phóng đại thành hệ thống vận hành doanh nghiệp.
+  </div>
+  <div class="meta">
+    <span>Dữ liệu thô: 2.240 dòng x 29 cột</span>
+    <span>Sau lọc nhiễu: 2.236 bản ghi</span>
+    <span>Phân chia 80/20: Train 1.788 | Test 448</span>
+    <span>Đặc trưng gom cụm: Age, Income, Total_Spending</span>
+    <span>Chuẩn hóa chọn: StandardScaler</span>
+    <span>Mô hình đại diện: K-Means (K = 2)</span>
+    <span>Train Silhouette: 0,4119 | Test Holdout: 0,4453</span>
+  </div>
+</header>
+
+<nav aria-label="Mục lục báo cáo">
+  <h2>Mục lục nội dung</h2>
+  <ol>
+    <li><a href="#problem">1. Đặt vấn đề, điều chỉnh dữ liệu từ đề gốc và tiêu chí đánh giá</a></li>
+    <li><a href="#design">2. Thiết kế chương trình và luồng xử lý dữ liệu</a></li>
+    <li><a href="#data">3. Nạp, kiểm toán dữ liệu gốc và phân tách 80/20</a></li>
+    <li><a href="#eda">4. Khám phá phân phối và tương quan đặc trưng (EDA)</a></li>
+    <li><a href="#scaling">5. Chuẩn hóa đặc trưng và đối chiếu tác động (Feature Scaling)</a></li>
+    <li><a href="#algorithms">6. Nền tảng toán học của bốn thuật toán phân cụm</a></li>
+    <li><a href="#experiments">7. Thực nghiệm quét tham số trên từng thuật toán</a></li>
+    <li><a href="#evaluation">8. Đánh giá tổng hợp, kiểm chứng Holdout Test và trực quan hóa</a></li>
+    <li><a href="#profiling">9. Chân dung phân khúc khách hàng và phân tích điểm biên</a></li>
+    <li><a href="#deployment">10. Đóng gói mô hình và tiện ích dự đoán thử nghiệm (CLI)</a></li>
+    <li><a href="#validation">11. Kiểm thử tự động và hướng dẫn chạy lại</a></li>
+    <li><a href="#limits">12. Giới hạn của bài lab và hướng mở rộng tiếp theo</a></li>
+    <li><a href="#sources">13. Hồ sơ nguồn đối chiếu và mức độ tin cậy kết luận</a></li>
+  </ol>
+</nav>
+
+<section id="problem">
+  <h2>1. Đặt vấn đề, điều chỉnh dữ liệu từ đề gốc và tiêu chí đánh giá</h2>
+  <h3>1.1. Yêu cầu đề bài và thực tế bộ dữ liệu</h3>
+  <p>Đề bài gốc trong <code>docs/Practice Exercise 3.pdf</code> mô tả bài toán phân cụm khách hàng cửa hàng bán lẻ từ 4 thông tin: <em>tuổi (age), giới tính (gender), thu nhập hàng năm (annual income)</em> và <em>điểm chi tiêu (spending score)</em>, yêu cầu thực hiện 4 bước: (1) Khám phá dữ liệu, (2) Chuẩn hóa đặc trưng, (3) Chọn và thử nghiệm tham số thuật toán phân cụm, (4) Đánh giá bằng chỉ số như Silhouette kết hợp biểu đồ Scatter/Dendrogram.</p>
+  <p>Khi kiểm tra tệp dữ liệu được cung cấp tại <code>data/raw/marketing_campaign.csv</code> (định dạng TSV phân tách tab, <strong>2.240 dòng x 29 cột</strong>), tập dữ liệu này thực chất không có sẵn 3 cột mang tên <code>Age</code>, <code>Gender</code> và <code>Spending Score (1-100)</code>. Thay vì tự bịa thêm dữ liệu giả hoặc bỏ qua sự chênh lệch này, bài lab xử lý minh bạch như sau:</p>
+  <ul>
+    <li><strong>Biến <code>Age</code>:</strong> Quy đổi từ cột <code>Year_Birth</code> bằng công thức <code>Age = 2014 - Year_Birth</code>. Mốc <code>REFERENCE_YEAR = 2014</code> được chọn vì toàn bộ cột ngày gia nhập <code>Dt_Customer</code> trong tập dữ liệu nằm trong khoảng năm <code>2012–2014</code>.</li>
+    <li><strong>Biến <code>Total_Spending</code>:</strong> Cộng tổng 6 khoản chi tiêu sản phẩm có sẵn gồm <code>MntWines</code>, <code>MntFruits</code>, <code>MntMeatProducts</code>, <code>MntFishProducts</code>, <code>MntSweetProducts</code> và <code>MntGoldProds</code>.</li>
+    <li><strong>Biến nhân khẩu học:</strong> Không tự tạo giả cột <code>Gender</code>. Hai cột phân loại thật là <code>Education</code> và <code>Marital_Status</code> chỉ giữ lại ở bước mô tả chân dung cụm sau khi phân nhóm, hoàn toàn không đưa vào tính khoảng cách để tránh làm nhiễu cấu trúc Euclidean 3 chiều.</li>
+    <li><strong>Biến định danh và nhãn ngoài phạm vi:</strong> Cột <code>ID</code> chỉ dùng làm khóa theo dõi bản ghi và loại khỏi ma trận đặc trưng; cột <code>Response</code> không dùng làm nhãn huấn luyện vì đây là bài toán học không giám sát.</li>
+  </ul>
+
+  <h3>1.2. Tiêu chí đánh giá phân cụm trong bài lab</h3>
+  <p>Vì phân cụm không có nhãn đúng (ground truth) để tính Accuracy như bài toán phân loại, chất lượng gom nhóm được đánh giá tổng hợp theo 4 tiêu chí nội tại và độ cân đối hình học:</p>
+  <ul>
+    <li><strong>Silhouette Coefficient (chính):</strong> Đo mức độ gắn kết trong cùng cụm so với khoảng cách tới cụm láng giềng gần nhất, nằm trong $[-1, 1]$ (càng gần $1$ càng rõ nét; ghi nhận thêm tỷ lệ điểm bị giá trị âm nằm ở vùng chồng lấn biên).</li>
+    <li><strong>Davies–Bouldin Index (DBI):</strong> Tỷ lệ độ phân tán nội cụm trên khoảng cách giữa hai tâm cụm; giá trị càng <em>thấp</em> chứng tỏ các cụm càng gọn và tách biệt.</li>
+    <li><strong>Calinski–Harabasz Score (CHI):</strong> Tỷ số phương sai giữa các cụm và phương sai trong cụm; giá trị càng <em>cao</em> càng tốt.</li>
+    <li><strong>Dunn Index &amp; Độ cân bằng cụm (Cluster Balance Ratio):</strong> Kết hợp kiểm tra tỷ lệ $\min(\text{kích thước cụm}) / \max(\text{kích thước cụm})$ để tránh chọn nhầm những phân hoạch chỉ tách vài điểm ngoại lai ra làm một cụm riêng.</li>
+  </ul>
+
+  <div class="qa">
+    <strong>Vì sao bài lab không ấn định trước số cụm $K = 5$?</strong>
+    <p>Nhiều ví dụ trực tuyến cho tập <em>Mall Customers</em> thường ra 5 cụm đặc trưng giữa thu nhập và điểm chi tiêu. Tuy nhiên, đề <code>Practice Exercise 3.pdf</code> không hề quy định trước số cụm phải là 5, và bộ dữ liệu thực tế ở đây là <code>marketing_campaign.csv</code> với phân phối khác hẳn. Vì vậy bài lab quét khách quan trên dải $K \in [2, 10]$ và chỉ chốt số cụm dựa trên kết quả đo đạc thực nghiệm.</p>
+  </div>
+</section>
+
+<section id="design">
+  <h2>2. Thiết kế chương trình và luồng xử lý dữ liệu</h2>
+  <p>Mã nguồn được tổ chức thành các module tách biệt theo 4 bước của đề bài, kết nối qua điểm vào chính <code>main.py</code> cho luồng huấn luyện – đánh giá và lớp <code>CustomerSegmentPredictor</code> trong <code>src/deployment/predictor.py</code> cho luồng suy luận khách hàng mới.</p>
+
+  <h3>2.1. Luồng huấn luyện và đánh giá chính (<code>main.py</code>)</h3>
+  <div class="flow" aria-label="Luồng thực thi pipeline chính">
+    <span>Đọc CSV &amp; Kiểm định schema</span><b>&rarr;</b>
+    <span>Lọc 4 bản ghi lỗi miền</span><b>&rarr;</b>
+    <span>Chia 80% Train / 20% Test</span><b>&rarr;</b>
+    <span>Điền trung vị Train &amp; EDA</span><b>&rarr;</b>
+    <span>So sánh &amp; Fit Scaler trên Train</span><b>&rarr;</b>
+    <span>Quét 4 thuật toán (K=2..10)</span><b>&rarr;</b>
+    <span>Đánh giá Holdout &amp; Profiling</span><b>&rarr;</b>
+    <span>Lưu .pkl &amp; Thử nghiệm CLI</span>
+  </div>
+  <p>Toàn bộ quá trình huấn luyện được điều phối tuần tự từ <code>main.py</code> theo nguyên tắc tách biệt Train/Test ngay sau bước lọc lỗi miền (trước khi tính trung vị điền khuyết và trước khi fit bộ chuẩn hóa) để chặn rò rỉ dữ liệu. Sau khi quét tham số 4 thuật toán trên tập Train và kiểm chứng lại mô hình tốt nhất trên tập Holdout Test 20%, hệ thống xuất dữ liệu đã xử lý vào <code>data/processed/</code>, lưu bảng chỉ số – biểu đồ – mô hình đóng gói vào <code>results/</code> và gọi thử nghiệm suy luận ngay cuối pipeline.</p>
+
+  <h3>2.2. Luồng suy luận dự đoán phân khúc khách hàng mới (Inference Pipeline)</h3>
+  <div class="flow" aria-label="Luồng suy luận phân khúc khách hàng mới">
+    <span>Nạp bundle .pkl</span><b>&rarr;</b>
+    <span>Tiếp nhận &amp; suy diễn cột</span><b>&rarr;</b>
+    <span>Kiểm tra số hữu hạn &amp; miền</span><b>&rarr;</b>
+    <span>Điền trung vị &amp; Scaler Train</span><b>&rarr;</b>
+    <span>Predict cụm &amp; Tra Persona</span>
+  </div>
+  <ol>
+    <li><strong>Nạp artifact đã đóng băng:</strong> Lớp <code>CustomerSegmentPredictor</code> đọc tệp <code>results/models/final_kmeans_pipeline.pkl</code> chứa <code>scaler</code> (<code>FeatureScaler</code> đã fit trên Train), <code>model</code> (<code>KMeans</code>), và <code>metadata</code> (gồm <code>feature_medians</code> của Train, bảng <code>personas</code>, <code>reference_year</code> và <code>distance_metric</code>).</li>
+    <li><strong>Tiếp nhận và chuẩn hóa cột đầu vào:</strong> Ở chế độ đơn lẻ (<code>predict_single_customer</code>), hàm nhận trực tiếp bộ 3 giá trị <code>(Age, Income, Total_Spending)</code>; ở chế độ hàng loạt (<code>predict_batch</code>), nếu dữ liệu có <code>Year_Birth</code> thì tự tính <code>Age = reference_year - Year_Birth</code> và nếu có đủ 6 cột <code>Mnt*</code> thì tính tổng thành <code>Total_Spending</code>.</li>
+    <li><strong>Kiểm định kiểu số và miền giá trị:</strong> Các hàm <code>_numeric_column</code> và <code>_validate_features</code> từ chối giá trị không phải số, vô cùng (<code>inf</code>/<code>-inf</code>), <code>Age</code> nằm ngoài khoảng <code>(0, 120]</code> hoặc giá trị âm ở <code>Income</code>, <code>Total_Spending</code> và các cột <code>Mnt*</code>.</li>
+    <li><strong>Điền khuyết và co giãn theo tham số đóng băng:</strong> Ở chế độ batch, các ô khuyết trong 3 đặc trưng cốt lõi được điền bằng đúng <code>feature_medians</code> của tập Train (chế độ đơn lẻ bắt buộc đủ 3 giá trị hợp lệ); sau đó toàn bộ ma trận đặc trưng được co giãn bằng <code>scaler.transform()</code> mà tuyệt đối không fit lại trên dữ liệu mới.</li>
+    <li><strong>Gán nhãn cụm và ánh xạ khuyến nghị:</strong> Gọi <code>model.predict()</code> trên không gian đã chuẩn hóa để thu về <code>Predicted_Cluster</code>, tính khoảng cách tới tâm cụm (Manhattan <code>cityblock</code> hoặc Euclidean trong không gian chuẩn hóa đối với dự đoán đơn lẻ), và tra <code>Persona_Name</code> cùng <code>Marketing_Recommendation</code> tương ứng từ <code>metadata["personas"]</code>.</li>
+  </ol>
+
+  <h3>2.3. Bảng phân bổ trách nhiệm các module</h3>
+  <div class="table-wrap">
+    <table>
+      <caption>Cấu trúc các module mã nguồn và tệp đầu ra chính của bài lab</caption>
+      <thead>
+        <tr>
+          <th>Nhóm module</th>
+          <th>Tệp nguồn</th>
+          <th>Nhiệm vụ chính</th>
+          <th>Đầu ra tạo ra</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Cấu hình &amp; Log</strong></td>
+          <td><code>src/config.py</code>, <code>src/utils/logger.py</code></td>
+          <td>Định nghĩa đường dẫn dữ liệu/kết quả, cố định <code>RANDOM_SEED=42</code>, bảng màu, ghi log thực thi</td>
+          <td><code>results/metrics/pipeline_execution.log</code></td>
+        </tr>
+        <tr>
+          <td><strong>Dữ liệu &amp; Tiền xử lý</strong></td>
+          <td><code>src/data/loader.py</code>, <code>src/data/preprocessing.py</code></td>
+          <td>Nạp tệp TSV, kiểm tra schema, suy diễn <code>Age</code> và <code>Total_Spending</code>, lọc dị biệt, chia 80/20, điền trung vị, audit IQR</td>
+          <td><code>train.csv</code>, <code>test.csv</code>, <code>raw_data_audit.csv</code>, <code>train_iqr_audit.csv</code></td>
+        </tr>
+        <tr>
+          <td><strong>Chuẩn hóa đặc trưng</strong></td>
+          <td><code>src/features/scaling.py</code></td>
+          <td>Cài đặt <code>FeatureScaler</code> (Standard, MinMax, Robust), kiểm tra hậu điều kiện Train/Test, đối chiếu tác động lên K-Means</td>
+          <td><code>scaler_params.csv</code>, <code>scaler_comparison.csv</code>, <code>scaler_verification.csv</code>, <code>scaler_clustering_comparison.csv</code></td>
+        </tr>
+        <tr>
+          <td><strong>Mô hình phân cụm</strong></td>
+          <td><code>src/models/kmeans.py</code>, <code>hierarchical.py</code>, <code>dbscan.py</code>, <code>kmedoids.py</code>, <code>persistence.py</code></td>
+          <td>Huấn luyện, quét tham số 4 thuật toán và đóng gói pipeline <code>final_kmeans_pipeline.pkl</code></td>
+          <td>8 bảng CSV quét tham số &amp; tệp mô hình <code>.pkl</code></td>
+        </tr>
+        <tr>
+          <td><strong>Đánh giá &amp; Trực quan</strong></td>
+          <td><code>src/evaluation/metrics.py</code>, <code>visualization.py</code>, <code>profiling.py</code></td>
+          <td>Tính Silhouette, DBI, CHI, Dunn; vẽ 10 biểu đồ PNG; lập bảng thống kê cụm và sinh mô tả phân khúc động</td>
+          <td>10 ảnh PNG, <code>model_comparison.csv</code>, <code>holdout_test_evaluation.csv</code>, <code>cluster_profiles.csv</code></td>
+        </tr>
+        <tr>
+          <td><strong>Suy luận thử nghiệm</strong></td>
+          <td><code>src/deployment/predictor.py</code></td>
+          <td>Nạp bundle <code>.pkl</code>, tự điền khuyết theo trung vị Train nếu thiếu <code>Income</code>, gán cụm 1 khách hàng hoặc hàng loạt qua CLI</td>
+          <td><code>test_predictions.csv</code> và kết quả dự đoán trên terminal</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="data">
+  <h2>3. Nạp, kiểm toán dữ liệu gốc và phân tách 80/20</h2>
+  <h3>3.1. Kiểm toán dữ liệu thô trước khi làm sạch</h3>
+  <p>Tệp <code>data/raw/marketing_campaign.csv</code> chứa đúng <strong>2.240 dòng x 29 cột</strong> với mã định danh <code>ID</code> duy nhất hoàn toàn (0 bản ghi trùng <code>ID</code>, 0 ô thiếu <code>ID</code>). Khi rà soát theo từng cột và kiểm tra ngoại lai bằng khoảng tứ phân vị IQR trên tập thô (<code>results/metrics/raw_data_audit.csv</code>), ghi nhận các điểm bất thường sau:</p>
+  <div class="table-wrap">
+    <table>
+      <caption>Kiểm toán giá trị khuyết và ngoại lai IQR trên 2.240 bản ghi gốc (<code>raw_data_audit.csv</code>)</caption>
+      <thead>
+        <tr>
+          <th>Đặc trưng</th>
+          <th>Null Count</th>
+          <th>Tỷ lệ Null</th>
+          <th>Q1</th>
+          <th>Q3</th>
+          <th>IQR</th>
+          <th>Ngưỡng dưới</th>
+          <th>Ngưỡng trên</th>
+          <th>Số Outlier IQR</th>
+          <th>Tỷ lệ Outlier</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Age</code></td><td>0</td><td>0,00%</td><td>37,0</td><td>55,0</td><td>18,0</td><td>10,00</td><td>82,00</td><td>3</td><td>0,13%</td></tr>
+        <tr><td><code>Income</code></td><td>24</td><td>1,07%</td><td>35.303,0</td><td>68.522,0</td><td>33.219,0</td><td>-14.525,50</td><td>118.350,50</td><td>8</td><td>0,36%</td></tr>
+        <tr><td><code>Total_Spending</code></td><td>0</td><td>0,00%</td><td>68,75</td><td>1.045,5</td><td>976,75</td><td>-1.396,38</td><td>2.510,62</td><td>3</td><td>0,13%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li><strong>Các bản ghi dị biệt cực đoan (lỗi miền giá trị):</strong> 3 khách hàng có năm sinh nhỏ hơn <code>1920</code> gồm <code>ID 7829</code> (<code>1900</code>), <code>ID 11004</code> (<code>1893</code>), <code>ID 1150</code> (<code>1899</code>) tương ứng 114–121 tuổi; cùng 1 khách hàng có thu nhập vượt trội phi thực tế là <code>ID 9432</code> (<code>Income = 666.666,0</code>, cao gấp hơn 4 lần mức cao nhất kế tiếp là <code>162.397,0</code>). Tổng cộng có <strong>4 bản ghi</strong> cần lọc bỏ trước khi phân cụm.</li>
+    <li><strong>Các nhãn hiếm ở cột <code>Marital_Status</code>:</strong> Dữ liệu gốc có <code>Married (864)</code>, <code>Together (580)</code>, <code>Single (480)</code>, <code>Divorced (232)</code>, <code>Widow (77)</code>, và một số nhãn lạ gồm <code>Alone (3)</code>, <code>Absurd (2)</code>, <code>YOLO (2)</code>. Các nhãn này được giữ nguyên vì cột này chỉ dùng đọc thống kê mô tả cụm sau cùng.</li>
+  </ul>
+
+  <h3>3.2. Phân tách tập Train / Holdout Test và chống rò rỉ dữ liệu</h3>
+  <p>Sau khi loại 4 bản ghi lỗi miền (còn <strong>2.236 mẫu</strong>), dữ liệu được chia ngẫu nhiên cố định theo tỷ lệ <strong>80% Train (<code>1.788</code> mẫu) / 20% Holdout Test (<code>448</code> mẫu)</strong> với <code>RANDOM_SEED = 42</code>. Bước tính trung vị <code>Income = 51.650,50</code> chỉ thực hiện trên <code>1.788</code> mẫu của Train rồi dùng giá trị này điền khuyết cho <strong>18 ô thiếu trong Train</strong> và <strong>6 ô thiếu trong Test</strong>.</p>
+  <div class="qa">
+    <strong>Vì sao giữ lại các bản ghi trùng trên 3 đặc trưng số và các điểm IQR hợp lệ ở tập Train?</strong>
+    <p>Sau khi làm sạch, tập Train còn <code>136</code> bản ghi trùng nhau hoàn toàn trên 3 chiều <code>[Age, Income, Total_Spending]</code> nhưng khác mã <code>ID</code>; đây là các khách hàng thật có cùng tuổi, mức thu nhập và tổng chi tiêu, không phải lỗi trùng lặp dòng (<code>ID</code> trùng bằng 0). Ngoài ra, phân tích IQR trên tập Train (<code>train_iqr_audit.csv</code>) chỉ còn <code>7</code> mẫu <code>Income &gt; 117.654,75</code> (tối đa <code>162.397,0</code>, chiếm <code>0,39%</code>) và <code>1</code> mẫu <code>Total_Spending &gt; 2.505,25</code> (<code>2.524,0</code>, chiếm <code>0,06%</code>). Đây đều là khách hàng thu nhập/chi tiêu cao hoàn toàn hợp lý nên được giữ nguyên để mô hình phản ánh đúng tệp khách hàng giàu.</p>
+  </div>
+</section>
+
+<section id="eda">
+  <h2>4. Khám phá phân phối và tương quan đặc trưng (EDA)</h2>
+  <p>Trên tập Train (<code>1.788</code> mẫu đã làm sạch), các đặc trưng số có hình thái phân phối khác biệt khá rõ:</p>
+  <div class="table-wrap">
+    <table>
+      <caption>Thống kê mô tả và kiểm toán IQR trên tập Train (1.788 mẫu)</caption>
+      <thead>
+        <tr>
+          <th>Đặc trưng</th>
+          <th>Min</th>
+          <th>Q1</th>
+          <th>Median</th>
+          <th>Mean</th>
+          <th>Q3</th>
+          <th>Max</th>
+          <th>Std (ddof=0)</th>
+          <th>Skewness</th>
+          <th>Outlier IQR</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Age</code></td><td>18,0</td><td>37,0</td><td>44,0</td><td>45,23</td><td>55,0</td><td>74,0</td><td>11,85</td><td>0,095</td><td>0 (0,00%)</td></tr>
+        <tr><td><code>Income</code></td><td>2.447,0</td><td>35.196,0</td><td>51.650,5</td><td>51.975,56</td><td>68.179,5</td><td>162.397,0</td><td>21.560,98</td><td>0,413</td><td>7 (0,39%)</td></tr>
+        <tr><td><code>Total_Spending</code></td><td>5,0</td><td>69,0</td><td>397,5</td><td>605,60</td><td>1.043,5</td><td>2.524,0</td><td>598,65</td><td>0,857</td><td>1 (0,06%)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Biến <code>Age</code> phân phối khá đều quanh trung tâm 44–45 tuổi. Biến <code>Income</code> có trung bình xấp xỉ trung vị (~52 nghìn USD) với đuôi phải vừa phải. Riêng <code>Total_Spending</code> lệch phải mạnh (<code>skew = 0,8565</code>, trung vị chỉ <code>397,5</code> nhưng trung bình lên tới <code>605,6</code> và đỉnh ở <code>2.524</code>), phản ánh phần đông khách hàng chi tiêu ít và một nhóm khách hàng có thu nhập cao chi tiêu mạnh tạo thành cụm kéo dài về phía trên bên phải biểu đồ phân tán.</p>
+
+  <div class="fig-grid">
+    <figure>
+      <img src="../../results/figures/00a_eda_distributions.png" alt="Biểu đồ phân phối và Boxplot các đặc trưng trên tập Train">
+      <figcaption>Hình 1: Phân phối Histogram/KDE và Boxplot phát hiện ngoại lai cho Age, Income, Total_Spending (Train)</figcaption>
+    </figure>
+    <figure>
+      <img src="../../results/figures/00b_eda_correlations.png" alt="Biểu đồ tương quan song biến và phân phối theo học vấn">
+      <figcaption>Hình 2: Quan hệ song biến (Income vs Total_Spending, Age vs Total_Spending), ma trận tương quan và học vấn</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="scaling">
+  <h2>5. Chuẩn hóa đặc trưng và đối chiếu tác động (Feature Scaling)</h2>
+  <h3>5.1. Lý do bắt buộc phải chuẩn hóa và công thức 3 bộ biến đổi</h3>
+  <p>Ở thang đo gốc, độ lệch chuẩn của <code>Income</code> (<code>21.560,98</code>) lớn gấp gần <strong>1.820 lần</strong> so với <code>Age</code> (<code>11,85</code>). Nếu tính khoảng cách Euclidean bình phương $d^2(x, y) = \sum_{j=1}^{3} (x_j - y_j)^2$ mà không chuẩn hóa, chênh lệch thu nhập vài nghìn USD sẽ lấn át hoàn toàn chênh lệch tuổi tác hay chi tiêu.</p>
+  <div class="formula">
+    $$\text{StandardScaler:} \quad z_j = \frac{x_j - \mu_{\text{train}, j}}{\sigma_{\text{train}, j}}$$
+    $$\text{MinMaxScaler:} \quad x'_j = \frac{x_j - x_{\min,\text{train}, j}}{x_{\max,\text{train}, j} - x_{\min,\text{train}, j}}$$
+    $$\text{RobustScaler:} \quad \tilde{x}_j = \frac{x_j - \text{Median}_{\text{train}, j}}{\text{IQR}_{\text{train}, j}}$$
+  </div>
+  <p>Các tham số $\mu, \sigma, x_{\min}, x_{\max}, \text{Median}, \text{IQR}$ được học <strong>duy nhất trên 1.788 mẫu Train</strong> (ví dụ với <code>StandardScaler</code> trong <code>scaler_params.csv</code>: <code>Age</code> $\mu=45{,}2299, \sigma=11{,}8506$; <code>Income</code> $\mu=51.975{,}5587, \sigma=21.560{,}9848$; <code>Total_Spending</code> $\mu=605{,}5990, \sigma=598{,}6500$).</p>
+
+  <h3>5.2. So sánh phân phối thang đo và kiểm chứng hậu điều kiện Train/Test</h3>
+  <div class="table-wrap">
+    <table>
+      <caption>Thống kê phân phối tập Train qua 4 trạng thái thang đo (<code>scaler_comparison.csv</code>)</caption>
+      <thead>
+        <tr>
+          <th>Phương pháp</th>
+          <th>Đặc trưng</th>
+          <th>Min</th>
+          <th>Max</th>
+          <th>Mean</th>
+          <th>Std</th>
+          <th>Median</th>
+          <th>IQR</th>
+          <th>Skew</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Gốc (Raw)</td><td>Age</td><td>18,0000</td><td>74,0000</td><td>45,2299</td><td>11,8506</td><td>44,0000</td><td>18,0000</td><td>0,0950</td></tr>
+        <tr><td>Gốc (Raw)</td><td>Income</td><td>2.447,0000</td><td>162.397,0000</td><td>51.975,5587</td><td>21.560,9848</td><td>51.650,5000</td><td>32.983,5000</td><td>0,4129</td></tr>
+        <tr><td>Gốc (Raw)</td><td>Total_Spending</td><td>5,0000</td><td>2.524,0000</td><td>605,5990</td><td>598,6500</td><td>397,5000</td><td>974,5000</td><td>0,8565</td></tr>
+        <tr><td>StandardScaler</td><td>Age</td><td>-2,2978</td><td>2,4277</td><td>0,0000</td><td>1,0000</td><td>-0,1038</td><td>1,5189</td><td>0,0950</td></tr>
+        <tr><td>StandardScaler</td><td>Income</td><td>-2,2971</td><td>5,1214</td><td>0,0000</td><td>1,0000</td><td>-0,0151</td><td>1,5298</td><td>0,4129</td></tr>
+        <tr><td>StandardScaler</td><td>Total_Spending</td><td>-1,0033</td><td>3,2045</td><td>0,0000</td><td>1,0000</td><td>-0,3476</td><td>1,6278</td><td>0,8565</td></tr>
+        <tr><td>MinMaxScaler</td><td>Age</td><td>0,0000</td><td>1,0000</td><td>0,4862</td><td>0,2116</td><td>0,4643</td><td>0,3214</td><td>0,0950</td></tr>
+        <tr><td>MinMaxScaler</td><td>Income</td><td>0,0000</td><td>1,0000</td><td>0,3097</td><td>0,1348</td><td>0,3076</td><td>0,2062</td><td>0,4129</td></tr>
+        <tr><td>MinMaxScaler</td><td>Total_Spending</td><td>0,0000</td><td>1,0000</td><td>0,2384</td><td>0,2377</td><td>0,1558</td><td>0,3869</td><td>0,8565</td></tr>
+        <tr><td>RobustScaler</td><td>Age</td><td>-1,4444</td><td>1,6667</td><td>0,0683</td><td>0,6584</td><td>0,0000</td><td>1,0000</td><td>0,0950</td></tr>
+        <tr><td>RobustScaler</td><td>Income</td><td>-1,4918</td><td>3,3576</td><td>0,0099</td><td>0,6537</td><td>0,0000</td><td>1,0000</td><td>0,4129</td></tr>
+        <tr><td>RobustScaler</td><td>Total_Spending</td><td>-0,4028</td><td>2,1821</td><td>0,2135</td><td>0,6143</td><td>0,0000</td><td>1,0000</td><td>0,8565</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Khi áp tham số Train sang <strong>448 mẫu Holdout Test</strong> (<code>scaler_verification.csv</code>): <code>StandardScaler</code> giữ ổn định (<code>Mean</code> từ <code>-0,0539</code> đến <code>+0,0032</code>; <code>Std</code> từ <code>0,9339</code> đến <code>1,0254</code>). Trong khi đó, <code>MinMaxScaler</code> khiến <strong>3 mẫu Test vượt ra ngoài đoạn <code>[0, 1]</code></strong>: <code>1</code> mẫu có <code>Income = -0,0045</code> (dưới cận min Train <code>2.447,0</code>) và <code>2</code> mẫu có <code>Total_Spending</code> lên tới <code>1,0004</code> (vượt cận max Train <code>2.524,0</code>).</p>
+
+  <div class="table-wrap">
+    <table>
+      <caption>Đối chiếu thực nghiệm 3 phương pháp chuẩn hóa khi chạy K-Means (<code>scaler_clustering_comparison.csv</code>)</caption>
+      <thead>
+        <tr>
+          <th>Scaler</th>
+          <th>K tối ưu</th>
+          <th>Silhouette Train</th>
+          <th>DBI Train</th>
+          <th>CHI Train</th>
+          <th>Inertia Train</th>
+          <th>Cân bằng cụm</th>
+          <th>Silhouette (K=5)</th>
+          <th>DBI (K=5)</th>
+          <th>Silhouette Test</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eaf4f6;font-weight:600"><td>standard (Chọn)</td><td>2</td><td>0,4119</td><td>0,9892</td><td>1.495,38</td><td>2.919,54</td><td>0,7444</td><td>0,3527</td><td>0,9416</td><td>0,4453</td></tr>
+        <tr><td>minmax</td><td>2</td><td>0,4210</td><td>0,9963</td><td>1.463,04</td><td>117,39</td><td>0,6602</td><td>0,3812</td><td>0,8994</td><td>0,4561</td></tr>
+        <tr><td>robust</td><td>2</td><td>0,4026</td><td>1,0127</td><td>1.422,45</td><td>1.232,32</td><td>0,7598</td><td>0,3528</td><td>0,9412</td><td>0,4368</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <img src="../../results/figures/00c_scaling_comparison.png" alt="So sánh phân phối trước và sau StandardScaler">
+    <figcaption>Hình 3: Đối chiếu thang đo trước và sau khi chuẩn hóa bằng StandardScaler trên tập Train</figcaption>
+  </figure>
+
+  <div class="qa">
+    <strong>Vì sao chọn <code>StandardScaler</code> thay vì <code>MinMaxScaler</code> dù Silhouette của <code>MinMaxScaler</code> cao hơn nhẹ (0,4210 vs 0,4119)?</strong>
+    <p>Trong bảng phân phối trên tập Train, vì <code>Income</code> có một số khách hàng thu nhập cao tới <code>162.397</code> nên <code>MinMaxScaler</code> nén phần lớn <code>Income</code> về dải hẹp (<code>Std = 0,1348</code>), nhỏ hơn đáng kể so với độ trải của <code>Total_Spending</code> (<code>Std = 0,2377</code>). Việc thu hẹp trọng số tương đối của trục thu nhập giúp Silhouette tăng nhẹ lên <code>0,4210</code>, nhưng đánh đổi bằng chỉ số Davies–Bouldin xấu hơn (<code>0,9963 &gt; 0,9892</code>), Calinski–Harabasz thấp hơn (<code>1.463,04 &lt; 1.495,38</code>), hai cụm mất cân đối hơn (<code>0,6602</code> vs <code>0,7444</code>) và nhạy với điểm vượt biên <code>[0, 1]</code> ở tập mới. <code>StandardScaler</code> đảm bảo mọi trục đều có phương sai đơn vị $\sigma = 1$ nên cân bằng và ổn định hơn.</p>
+  </div>
+</section>
+
+<section id="algorithms">
+  <h2>6. Nền tảng toán học của bốn thuật toán phân cụm</h2>
+  <p>Tất cả thuật toán đều làm việc trên cùng ma trận đã chuẩn hóa bằng <code>StandardScaler</code> kích thước $1.788 \times 3$ với hạt giống ngẫu nhiên <code>RANDOM_SEED = 42</code>.</p>
+
+  <h3>6.1. K-Means (Baseline chính)</h3>
+  <p>K-Means chia tập dữ liệu $\{x_1, \dots, x_N\} \subset \mathbb{R}^3$ thành $K$ cụm $C_1, \dots, C_K$ sao cho tối thiểu hóa tổng bình phương khoảng cách từ mỗi điểm tới tâm cụm $\mu_k$ (Inertia / WCSS):</p>
+  <div class="formula">
+    $$\min_{\{C_k, \mu_k\}} \sum_{k=1}^{K} \sum_{x_i \in C_k} \|x_i - \mu_k\|_2^2, \qquad \mu_k = \frac{1}{|C_k|} \sum_{x_i \in C_k} x_i$$
+  </div>
+  <p>Bài lab sử dụng khởi tạo <code>k-means++</code> (chọn các tâm ban đầu cách xa nhau theo phân phối xác suất tỷ lệ với $D(x)^2$) nhằm giảm nguy cơ kẹt cực tiểu cục bộ so với chọn ngẫu nhiên thuần túy.</p>
+
+  <h3>6.2. Hierarchical Clustering (Agglomerative)</h3>
+  <p>Phân cụm phân cấp đi từ dưới lên, ban đầu coi mỗi mẫu là một cụm đơn rồi gộp dần cặp cụm gần nhất theo tiêu chuẩn khoảng cách liên kết (linkage):</p>
+  <ul>
+    <li><strong><code>ward</code>:</strong> Gộp cặp cụm $(A, B)$ làm tăng tổng phương sai nội cụm ít nhất ($\Delta \text{SSE} = \frac{|A||B|}{|A|+|B|}\|\mu_A - \mu_B\|_2^2$), có xu hướng tạo cụm gọn và cân đối.</li>
+    <li><strong><code>complete</code> và <code>average</code>:</strong> Đo lần lượt theo khoảng cách lớn nhất hoặc trung bình giữa mọi cặp điểm thuộc hai cụm. Chất lượng cây phân cấp so với ma trận khoảng cách gốc được đo bằng <em>Hệ số tương quan Cophenetic</em>.</li>
+  </ul>
+
+  <h3>6.3. DBSCAN (Density-Based Spatial Clustering of Applications with Noise)</h3>
+  <p>DBSCAN gom nhóm theo mật độ cục bộ dựa trên hai tham số bán kính lân cận $\varepsilon$ (<code>eps</code>) và số điểm tối thiểu <code>min_samples</code>. Một điểm là <em>điểm lõi (core point)</em> nếu trong hình cầu bán kính $\varepsilon$ quanh nó có ít nhất <code>min_samples</code> điểm; các điểm không nối được tới điểm lõi nào bị gán nhãn nhiễu <code>-1</code>. Thuật toán không cần truyền trước $K$ và có thể tách vùng thưa thành nhiễu, nhưng nhạy cảm với mật độ không đồng đều.</p>
+
+  <h3>6.4. K-Medoids (Tự cài đặt pha BUILD tất định &amp; cập nhật nội cụm)</h3>
+  <p>Trong <code>src/models/kmedoids.py</code>, thuật toán K-Medoids được tự cài đặt bằng NumPy/SciPy (không phụ thuộc thư viện ngoài), luôn chọn các <strong>điểm khách hàng thật</strong> làm tâm đại diện (medoid $m_k \in X$) để giảm ảnh hưởng của giá trị ngoại lai:</p>
+  <div class="formula">
+    $$\min_{\{m_1, \dots, m_K\} \subset X} \sum_{i=1}^{N} \min_{1 \le k \le K} d(x_i, m_k)$$
+  </div>
+  <p>Pha khởi tạo <code>BUILD</code> chọn medoid đầu tiên là điểm có tổng khoảng cách tới toàn bộ tập nhỏ nhất, các medoid kế tiếp chọn ứng viên giảm tổng chi phí nhiều nhất; sau đó lặp lại bước gán cụm Voronoi và cập nhật medoid mới trong từng cụm cho đến khi hội tụ (hỗ trợ cả khoảng cách <code>euclidean</code> lẫn <code>manhattan</code>).</p>
+</section>
+
+<section id="experiments">
+  <h2>7. Thực nghiệm quét tham số trên từng thuật toán</h2>
+
+  <h3>7.1. K-Means: Quét $K = 2 \ldots 10$ và thử nghiệm siêu tham số</h3>
+  <div class="table-wrap">
+    <table>
+      <caption>Kết quả quét số cụm K cho K-Means (<code>kmeans_k_search.csv</code>)</caption>
+      <thead>
+        <tr>
+          <th>Số cụm $K$</th>
+          <th>Inertia</th>
+          <th>Silhouette Score</th>
+          <th>Davies–Bouldin</th>
+          <th>Calinski–Harabasz</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eaf4f6;font-weight:600"><td>2</td><td>2.919,5358</td><td>0,4119</td><td>0,9892</td><td>1.495,38</td></tr>
+        <tr><td>3</td><td>2.124,7672</td><td>0,3662</td><td>0,9606</td><td>1.360,63</td></tr>
+        <tr><td>4</td><td>1.639,1406</td><td>0,3605</td><td>1,0051</td><td>1.351,38</td></tr>
+        <tr><td>5</td><td>1.384,5151</td><td>0,3527</td><td>0,9416</td><td>1.281,22</td></tr>
+        <tr><td>6</td><td>1.223,0876</td><td>0,3181</td><td>0,9570</td><td>1.206,64</td></tr>
+        <tr><td>7</td><td>1.105,5846</td><td>0,2989</td><td>1,0343</td><td>1.143,33</td></tr>
+        <tr><td>8</td><td>1.004,0989</td><td>0,3005</td><td>0,9696</td><td>1.104,15</td></tr>
+        <tr><td>9</td><td>925,9026</td><td>0,2950</td><td>0,9825</td><td>1.065,93</td></tr>
+        <tr><td>10</td><td>834,3847</td><td>0,3010</td><td>0,9494</td><td>1.072,47</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Tại $K = 2$ (đạt Silhouette cao nhất <code>0,4119</code> và Calinski–Harabasz cao nhất <code>1.495,38</code>), khi thử nghiệm 8 tổ hợp siêu tham số gồm <code>init ∈ {k-means++, random}</code>, <code>n_init ∈ {10, 20}</code>, <code>max_iter ∈ {100, 300}</code> (<code>kmeans_hyperparams.csv</code>), cả 8 cấu hình đều hội tụ cùng một nghiệm tối ưu (<code>Inertia = 2.919,5358</code>, <code>Silhouette = 0,4119</code>, <code>DBI = 0,9892</code>), riêng <code>k-means++</code> hội tụ nhanh hơn một nhịp (<strong>8 vòng lặp</strong> so với <strong>9 vòng lặp</strong> của <code>random</code>).</p>
+
+  <figure>
+    <img src="../../results/figures/01_elbow_and_silhouette.png" alt="Biểu đồ Elbow và Silhouette theo K">
+    <figcaption>Hình 4: Đường cong Elbow (Inertia) và Silhouette Score khi quét K từ 2 đến 10 của K-Means</figcaption>
+  </figure>
+
+  <h3>7.2. Hierarchical Clustering: So sánh Linkage và Quét $K$</h3>
+  <div class="table-wrap">
+    <table>
+      <caption>Đối chiếu các phương pháp liên kết tại K = 2 (<code>hierarchical_cophenetic.csv</code>)</caption>
+      <thead>
+        <tr>
+          <th>Linkage</th>
+          <th>Cophenetic Correlation</th>
+          <th>K=2 Silhouette</th>
+          <th>K=2 Balance Ratio</th>
+          <th>Kích thước cụm tại K=2</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eaf4f6;font-weight:600"><td>ward</td><td>0,6137</td><td>0,3948</td><td>0,7045</td><td>{0: 1.049, 1: 739}</td></tr>
+        <tr><td>complete</td><td>0,5958</td><td>0,5701</td><td>0,0045</td><td>{0: 1.780, 1: 8}</td></tr>
+        <tr><td>average</td><td>0,6940</td><td>0,5701</td><td>0,0045</td><td>{0: 1.780, 1: 8}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Phát hiện đáng chú ý:</strong> Dù <code>average</code> đạt Cophenetic cao nhất (<code>0,6940</code>) và cùng <code>complete</code> có Silhouette tại $K=2$ tới <code>0,5701</code>, cả hai đều bị <strong>hiệu ứng xích (chaining)</strong>: tách đúng 8 khách hàng thu nhập/chi tiêu cực cao ở rìa thành một cụm tí hon và dồn toàn bộ <code>1.780</code> người còn lại vào cụm còn lại (độ cân bằng chỉ <code>0,0045</code>). Do đó bài lab chọn <strong><code>ward</code></strong> làm đối chứng chính vì tạo phân tách có nghĩa (<code>1.049</code> và <code>739</code> mẫu). Khi quét $K=2 \ldots 10$ với <code>ward</code> (<code>hierarchical_k_search.csv</code>), Silhouette cũng đạt đỉnh ở <strong>$K=2$ (<code>0,3948</code>)</strong> rồi giảm dần (<code>K=3: 0,3333</code>, <code>K=4: 0,3206</code>, <code>K=5: 0,3088</code>, <code>K=10: 0,2413</code>).</p>
+
+  <figure>
+    <img src="../../results/figures/04_hierarchical_dendrogram.png" alt="Biểu đồ Dendrogram Hierarchical Ward">
+    <figcaption>Hình 5: Dendrogram của Hierarchical Clustering (Ward linkage) kèm đường cắt ngang tại K = 2</figcaption>
+  </figure>
+
+  <h3>7.3. DBSCAN: Đồ thị k-NN và lưới tìm kiếm tham số</h3>
+  <p>Lưới tham số quét 24 tổ hợp với <code>eps ∈ {0.3, 0.4, 0.5, 0.6, 0.7, 0.8}</code> và <code>min_samples ∈ {4, 5, 8, 10}</code> (<code>dbscan_grid_search.csv</code>). Những cấu hình có <code>eps &ge; 0,6</code> (hoặc <code>eps=0,5, min_samples &ge; 5</code> và <code>eps=0,4, min_samples ∈ {5, 8}</code>) gộp phần lõi thành <strong>duy nhất 1 cụm</strong> nên không đủ điều kiện tính Silhouette (code trả <code>NaN</code> thay vì gán giả giá trị <code>0</code>). Cấu hình tốt nhất trong lưới là <code>eps = 0,5, min_samples = 4</code> đạt Silhouette (không tính nhiễu) <code>0,3596</code> với <code>3</code> cụm và <code>24</code> điểm nhiễu (<code>1,34%</code>); cấu hình có 2 cụm rõ hơn là <code>eps = 0,4, min_samples = 10</code> nhưng bỏ nhiễu tới <code>132</code> điểm (<code>7,38%</code>, Silhouette <code>0,3233</code>).</p>
+
+  <div class="fig-grid">
+    <figure>
+      <img src="../../results/figures/06_dbscan_k_distance.png" alt="Đồ thị k-NN k-distance hỗ trợ chọn eps cho DBSCAN">
+      <figcaption>Hình 6: Đồ thị khoảng cách k-NN (k = 4, đã loại tự khoảng cách 0) hỗ trợ xác định điểm khuỷu tay cho eps</figcaption>
+    </figure>
+    <figure>
+      <img src="../../results/figures/02b_dbscan_clusters_2d.png" alt="Biểu đồ phân cụm mật độ DBSCAN và điểm nhiễu">
+      <figcaption>Hình 7: Phân cụm DBSCAN (eps = 0,5, min_samples = 4) tách 1 cụm lớn, 2 vi cụm rìa và 24 điểm nhiễu (-1)</figcaption>
+    </figure>
+  </div>
+
+  <h3>7.4. K-Medoids: Quét $K$ và so sánh thước đo khoảng cách</h3>
+  <p>Quét $K = 2 \ldots 10$ với thước đo <code>euclidean</code> (<code>kmedoids_k_search.csv</code>) cũng hội tụ đỉnh Silhouette tại <strong>$K = 2$ (<code>0,4080</code>)</strong> (<code>Total_Cost = 2.057,1048</code>; so với <code>K=3: 0,3663</code>, <code>K=4: 0,2870</code>, <code>K=5: 0,3240</code>). Đối chiếu hai thước đo tại $K = 2$ (<code>kmedoids_metric_comparison.csv</code>) cho thấy <code>euclidean</code> (<code>Silhouette = 0,4080</code>, <code>DBI = 0,9918</code>, <code>CHI = 1.486,32</code>) nhỉnh nhẹ hơn <code>manhattan</code> (<code>Silhouette = 0,4033</code>, <code>DBI = 1,0028</code>, <code>CHI = 1.436,99</code>, <code>Total_Cost = 2.965,3186</code>).</p>
+</section>
+
+<section id="evaluation">
+  <h2>8. Đánh giá tổng hợp, kiểm chứng Holdout Test và trực quan hóa</h2>
+  <h3>8.1. Bảng đối chiếu 4 mô hình trên tập Train (1.788 mẫu)</h3>
+  <div class="table-wrap">
+    <table>
+      <caption>So sánh tổng hợp 4 thuật toán phân cụm trên tập Train (<code>model_comparison.csv</code>)</caption>
+      <thead>
+        <tr>
+          <th>Thuật toán</th>
+          <th>Số cụm K</th>
+          <th>Mẫu hợp lệ</th>
+          <th>Điểm nhiễu (%)</th>
+          <th>Silhouette Score</th>
+          <th>Silhouette âm (%)</th>
+          <th>Davies–Bouldin</th>
+          <th>Calinski–Harabasz</th>
+          <th>Dunn Index</th>
+          <th>Độ cân bằng cụm</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eaf4f6;font-weight:600"><td>K-Means (K=2)</td><td>2</td><td>1.788</td><td>0 (0,00%)</td><td>0,4119</td><td>1,68%</td><td>0,9892</td><td>1.495,38</td><td>0,0161</td><td>0,7444</td></tr>
+        <tr><td>K-Medoids (K=2)</td><td>2</td><td>1.788</td><td>0 (0,00%)</td><td>0,4080</td><td>2,80%</td><td>0,9918</td><td>1.486,32</td><td>0,0106</td><td>0,8079</td></tr>
+        <tr><td>Hierarchical Ward (K=2)</td><td>2</td><td>1.788</td><td>0 (0,00%)</td><td>0,3948</td><td>5,03%</td><td>1,0195</td><td>1.387,73</td><td>0,0200</td><td>0,7045</td></tr>
+        <tr><td>DBSCAN (eps=0.5, ms=4)</td><td>3</td><td>1.764</td><td>24 (1,34%)</td><td>0,3596</td><td>14,51%</td><td>0,5214</td><td>19,06</td><td>0,0704</td><td>0,0017</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Cả 3 mô hình dựa trên khoảng cách (<code>K-Means</code>, <code>K-Medoids</code>, <code>Hierarchical Ward</code>) cùng đạt đỉnh tối ưu tại <strong>$K = 2$</strong>. Trong đó, <code>K-Means (K=2)</code> được chọn làm mô hình cuối cùng vì đạt Silhouette cao nhất (<code>0,4119</code>), Calinski–Harabasz cao nhất (<code>1.495,38</code>), Davies–Bouldin tốt nhất trong nhóm phân hoạch cân đối (<code>0,9892</code>) và tỷ lệ điểm có Silhouette âm thấp nhất (<code>1,68%</code>). Mặc dù <code>DBSCAN</code> có DBI (<code>0,5214</code>) và Dunn Index (<code>0,0704</code>) nhìn bề ngoài tốt hơn, đó chỉ là hệ quả hình học khi tách 2 vi cụm siêu nhỏ (5 điểm và 3 điểm) ở rìa khỏi 1 khối lớn 1.756 điểm (cân bằng chỉ <code>0,0017</code>), không có giá trị phân khúc khách hàng.</p>
+
+  <h3>8.2. Kiểm chứng độ ổn định phân bố cụm trên tập Holdout Test (448 mẫu)</h3>
+  <div class="table-wrap">
+    <table>
+      <caption>Kết quả áp mô hình đã học lên tập Holdout Test độc lập (<code>holdout_test_evaluation.csv</code>)</caption>
+      <thead>
+        <tr>
+          <th>Mô hình (áp tâm cụm Train sang Test)</th>
+          <th>Số cụm</th>
+          <th>Silhouette Test</th>
+          <th>Silhouette âm (%)</th>
+          <th>Davies–Bouldin</th>
+          <th>Calinski–Harabasz</th>
+          <th>Dunn Index</th>
+          <th>Độ cân bằng cụm</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background:#eaf4f6;font-weight:600"><td>K-Means Test Holdout (K=2)</td><td>2</td><td>0,4453</td><td>2,01%</td><td>0,8977</td><td>455,16</td><td>0,0291</td><td>0,7231</td></tr>
+        <tr><td>K-Medoids Test Holdout (K=2)</td><td>2</td><td>0,4418</td><td>2,68%</td><td>0,9023</td><td>451,75</td><td>0,0316</td><td>0,7708</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Trên 448 khách hàng mới của tập Test, K-Means gán <code>188</code> người vào Cụm 0 (<code>41,96%</code>) và <code>260</code> người vào Cụm 1 (<code>58,04%</code>), rất sát tỷ lệ <code>42,67% / 57,33%</code> ở tập Train (<code>test_predictions.csv</code>).</p>
+
+  <div class="qa">
+    <strong>Việc tính Silhouette trên Holdout Test có dùng để khẳng định "mô hình không bị overfitting" như học có giám sát không?</strong>
+    <p>Không nên diễn giải như vậy. Do phân cụm không có nhãn chuẩn, các chỉ số nội tại trên Holdout Test chỉ giúp kiểm tra xem <strong>ranh giới và tâm cụm đã học có giữ được cấu trúc phân tách nhất quán</strong> khi gặp dữ liệu mới cùng phân phối hay không, chứ không phải phép đo sai số khái quát hóa (generalization error) như bài toán phân loại/hồi quy có nhãn.</p>
+  </div>
+
+  <h3>8.3. Trực quan hóa mô hình K-Means được chọn (K = 2)</h3>
+  <div class="fig-grid">
+    <figure>
+      <img src="../../results/figures/02_clusters_2d.png" alt="Phân cụm K-Means trên mặt phẳng Income và Total_Spending">
+      <figcaption>Hình 8: Phân bố 2 cụm K-Means kèm tâm cụm quy đổi về thang đo gốc (Income vs Total_Spending)</figcaption>
+    </figure>
+    <figure>
+      <img src="../../results/figures/03_clusters_3d.png" alt="Không gian 3 chiều Age, Income và Total_Spending">
+      <figcaption>Hình 9: Không gian phân cụm 3D (Age x Income x Total_Spending) của mô hình K-Means</figcaption>
+    </figure>
+  </div>
+  <figure>
+    <img src="../../results/figures/05_silhouette_analysis.png" alt="Biểu đồ Silhouette Knife Plot cho từng cụm của K-Means">
+    <figcaption>Hình 10: Silhouette Knife Plot chi tiết từng cụm của K-Means (K = 2) — đường nét đứt thể hiện mức trung bình 0,4119</figcaption>
+  </figure>
+</section>
+
+<section id="profiling">
+  <h2>9. Chân dung phân khúc khách hàng và phân tích điểm biên</h2>
+  <h3>9.1. Hồ sơ thống kê 2 cụm khách hàng từ tập Train (<code>cluster_profiles.csv</code>)</h3>
+  <div class="table-wrap">
+    <table>
+      <caption>Thống kê đặc điểm nhân khẩu học và hành vi chi tiêu theo cụm (K-Means, K = 2)</caption>
+      <thead>
+        <tr>
+          <th>Cụm</th>
+          <th>Số lượng (%)</th>
+          <th>Tuổi TB (Trung vị)</th>
+          <th>Thu nhập TB (Trung vị)</th>
+          <th>Chi tiêu TB (Trung vị)</th>
+          <th>Học vấn phổ biến</th>
+          <th>Hôn nhân phổ biến</th>
+          <th>Danh mục chi chính</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Cụm 0</strong><br>VIP / Giá trị cao</td>
+          <td>763 (42,67%)</td>
+          <td>47,64 (48,0)</td>
+          <td>$71.704,57 ($70.647,0)</td>
+          <td>$1.191,48 ($1.150,0)</td>
+          <td>Graduation (52,9%)</td>
+          <td>Married (37,4%)</td>
+          <td>MntWines (TB: 605,6)</td>
+        </tr>
+        <tr>
+          <td><strong>Cụm 1</strong><br>Tiết kiệm / Nhạy cảm giá</td>
+          <td>1.025 (57,33%)</td>
+          <td>43,43 (42,0)</td>
+          <td>$37.289,47 ($37.401,0)</td>
+          <td>$169,48 ($85,0)</td>
+          <td>Graduation (49,3%)</td>
+          <td>Married (40,2%)</td>
+          <td>MntWines (TB: 81,7)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li><strong>Cụm 0 — Khách hàng VIP / Giá trị cao (42,67%):</strong> Độ tuổi nhỉnh hơn (trung bình ~48 tuổi), thu nhập trung bình hơn <code>$71.700</code> và tổng chi tiêu gần gấp 7 lần Cụm 1 (trung vị <code>$1.150</code> so với <code>$85</code>). Chiếm phần lớn doanh thu và chi mạnh cho rượu vang (<code>MntWines</code> trung bình <code>605,6</code>). <em>Gợi ý:</em> chăm sóc hội viên thân thiết, ưu đãi cá nhân hóa theo các nhóm sản phẩm cao cấp.</li>
+    <li><strong>Cụm 1 — Khách hàng Tiết kiệm / Nhạy cảm giá (57,33%):</strong> Chiếm đa số về số lượng người dùng nhưng chi tiêu trung vị chỉ <code>$85</code>, thu nhập trung bình khoảng <code>$37.289</code> và độ tuổi trẻ hơn (trung vị 42 tuổi). <em>Gợi ý:</em> combo sản phẩm thiết yếu giá tốt, tích điểm đổi quà và khuyến mãi theo dịp.</li>
+  </ul>
+
+  <h3>9.2. Phân tích nhóm điểm biên có Silhouette âm (Boundary Analysis)</h3>
+  <p>Do phân cụm không có nhãn đúng, thay cho phân tích lỗi sai nhãn, bài lab kiểm tra trực tiếp <strong>30 mẫu (1,68%)</strong> trên tập Train có hệ số Silhouette âm ($s_i &lt; 0$, nghĩa là điểm nằm gần ranh giới cụm láng giềng hơn cụm được gán). Kiểm tra thực nghiệm trên mô hình <code>final_kmeans_pipeline.pkl</code> cho thấy toàn bộ 30 điểm này đều thuộc <strong>Cụm 0</strong> (Cụm 1 có 0 điểm âm):</p>
+  <div class="table-wrap">
+    <table>
+      <caption>5 khách hàng có Silhouette âm thấp nhất trên tập Train (trích kiểm tra trực tiếp từ mô hình đã lưu)</caption>
+      <thead>
+        <tr>
+          <th>ID khách hàng</th>
+          <th>Tuổi (Age)</th>
+          <th>Thu nhập (Income)</th>
+          <th>Tổng chi (Total_Spending)</th>
+          <th>Cụm được gán</th>
+          <th>Silhouette mẫu</th>
+          <th>Lý giải vùng giao thoa</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>8970</td><td>42</td><td>$62.010</td><td>$530</td><td>0</td><td>-0,0663</td><td>Thu nhập tiệm cận Cụm 0 nhưng chi tiêu mức trung bình thấp gần tâm Cụm 1</td></tr>
+        <tr><td>1343</td><td>46</td><td>$58.554</td><td>$586</td><td>0</td><td>-0,0585</td><td>Nằm đúng dải chuyển tiếp thu nhập ~58k và chi tiêu ~586</td></tr>
+        <tr><td>3594</td><td>41</td><td>$54.108</td><td>$747</td><td>0</td><td>-0,0554</td><td>Tuổi gần Cụm 1, thu nhập và chi tiêu ở giữa hai tâm cụm</td></tr>
+        <tr><td>10704</td><td>45</td><td>$54.803</td><td>$693</td><td>0</td><td>-0,0541</td><td>Tất cả 3 chiều đều nằm sát mặt phẳng trung trực của 2 tâm cụm</td></tr>
+        <tr><td>10476</td><td>56</td><td>$67.267</td><td>$251</td><td>0</td><td>-0,0537</td><td>Thu nhập khá cao (kéo về Cụm 0) nhưng chi tiêu thực tế rất ít ($251)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Đây là bằng chứng trực quan cho thấy trong thực tế kinh doanh vẫn tồn tại một vùng chuyển tiếp (khách hàng thu nhập khá nhưng chi tiêu dè dặt); phép phân cụm cứng K-Means buộc mỗi điểm phải thuộc hẳn một phía của siêu phẳng ranh giới thay vì phản ánh độ mờ vùng biên.</p>
+</section>
+
+<section id="deployment">
+  <h2>10. Đóng gói mô hình và tiện ích dự đoán thử nghiệm (CLI)</h2>
+  <p>Để minh họa bước sử dụng lại mô hình đã huấn luyện trong bài lab, <code>src/models/persistence.py</code> đóng gói <code>final_kmeans_pipeline.pkl</code> gồm: đối tượng <code>KMeans</code> ($K=2$), đối tượng <code>FeatureScaler</code> đã fit trên Train, cùng <code>metadata</code> (<code>feature_cols</code>, <code>scaler_method</code>, <code>n_clusters</code>, <code>reference_year=2014</code>, <code>feature_medians</code> của tập Train để điền khuyết <code>Income</code> nếu dữ liệu mới bị thiếu, và danh sách <code>personas</code>).</p>
+  <p>Lớp <code>CustomerSegmentPredictor</code> trong <code>src/deployment/predictor.py</code> hỗ trợ suy luận một khách hàng mới hoặc một tệp dữ liệu hàng loạt qua dòng lệnh; đồng thời kiểm tra nghiêm ngặt miền dữ liệu (chặn giá trị không hữu hạn, tuổi ngoài <code>(0, 120]</code>, thu nhập/tổng chi/khoản chi thành phần <code>Mnt*</code> âm kèm index dòng lỗi) và dùng trung vị Train trong <code>feature_medians</code> để điền giá trị khuyết:</p>
+  <pre><code>.\.venv\Scripts\python.exe -m src.deployment.predictor --age 35 --income 75000 --spending 1400
+
+# Kết quả thực tế in ra:
+# Cụm dự đoán: 0 - Khách hàng VIP / Giá trị cao (Trung niên/Cao tuổi)
+# Khoảng cách tới tâm cụm: 1.1328
+# Chiến lược gợi ý: Ưu tiên chăm sóc hội viên VIP, truyền thông các danh mục chi tiêu chủ lực và cá nhân hóa ưu đãi duy trì mức chi tiêu cao.</code></pre>
+  <div class="note">
+    <strong>Giới hạn triển khai:</strong> Module đóng gói và CLI này chỉ dùng ở phạm vi mô phỏng suy luận và kiểm thử trong bài thực hành, không phải dịch vụ API web (FastAPI/Flask) hay hệ thống sản xuất có giám sát độ trôi dữ liệu (data drift).
+  </div>
+</section>
+
+<section id="validation">
+  <h2>11. Kiểm thử tự động và hướng dẫn chạy lại</h2>
+  <h3>11.1. Kết quả kiểm thử đơn vị (<code>tests/</code>)</h3>
+  <p>Dự án có bộ kiểm thử tự động gồm <strong>38 test cases</strong> chia đều theo 5 module (<code>test_data.py</code>, <code>test_features.py</code>, <code>test_models.py</code>, <code>test_evaluation.py</code>, <code>test_deployment.py</code>), kiểm tra tính đúng đắn của công thức tính tay (IQR, Dunn Index, K-Medoids medoid là điểm thật, chống data leakage khi fit scaler, chặn NaN/Inf/<code>Mnt*</code> âm, bảo vệ các trường hợp DBSCAN chỉ tạo 1 cụm không gán giả 0, và kiểm tra vòng đời lưu/nạp <code>.pkl</code> + CLI). Khi chạy:</p>
+  <pre><code>.\.venv\Scripts\python.exe -m unittest discover -s tests -v</code></pre>
+  <p>Kết quả xác nhận <strong>38/38 tests đạt <code>OK</code></strong>. Lưu ý rằng việc vượt qua 38 unit tests chứng minh mã nguồn chạy đúng các trường hợp đã kiểm tra trong bài lab chứ không thay thế đánh giá chất lượng mô hình trên dữ liệu ngoài tập mẫu.</p>
+
+  <h3>11.2. Môi trường và cách chạy lại toàn bộ bài lab</h3>
+  <p>Phiên bản môi trường đã chạy kiểm chứng trong <code>.venv</code>: <strong>Python 3.12.10</strong>, <code>NumPy 2.5.3</code>, <code>SciPy 1.18.1</code>, <code>Pandas 3.0.6</code>, <code>Scikit-learn 1.9.1</code>, <code>Matplotlib 3.11.2</code>, <code>Seaborn 0.13.2</code>, <code>Joblib 1.6.0</code>.</p>
+  <pre><code># 1. Kích hoạt môi trường ảo &amp; cài đặt thư viện (nếu chưa có)
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+
+# 2. Chạy toàn bộ pipeline (lưu kết quả vào data/processed/ và results/)
+.\.venv\Scripts\python.exe main.py
+
+# 3. Chạy bộ kiểm thử đơn vị (38 tests)
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+
+# 4. Hoặc mở &amp; chạy tuần tự notebooks/01_eda.ipynb -&gt; 04_evaluation_and_profiling.ipynb
+# (đầu ra được tách riêng tại notebooks/results/ để không ghi đè main.py)</code></pre>
+</section>
+
+<section id="limits">
+  <h2>12. Giới hạn của bài lab và hướng mở rộng tiếp theo</h2>
+  <ol>
+    <li><strong>Giới hạn dữ liệu lịch sử và thiếu biến giới tính:</strong> Tập <code>marketing_campaign.csv</code> thu thập giai đoạn <code>2012–2014</code> nên mức thu nhập và chi tiêu phản ánh bối cảnh cũ; ngoài ra không có biến <code>Gender</code> như mô tả khái quát của đề gốc.</li>
+    <li><strong>Gộp biến làm mất chi tiết hành vi:</strong> Việc gộp 6 cột <code>Mnt*</code> thành 1 chiều <code>Total_Spending</code> giúp bám sát không gian 3 chiều của đề và vẽ được biểu đồ 2D/3D trực quan, nhưng làm mất thông tin về cơ cấu giỏ hàng hay kênh mua sắm (<code>NumWebPurchases</code>, <code>NumStorePurchases</code>, <code>Recency</code>).</li>
+    <li><strong>Độ lệch phân phối của chi tiêu:</strong> Với <code>skew = 0,8565</code>, một số ít khách hàng thu nhập cao nhưng ít chi tiêu vẫn gây hiện tượng 30 điểm biên Silhouette âm (<code>1,68%</code>). Bài lab hiện chưa thử phép biến đổi <code>log1p(Total_Spending)</code> hay phân cụm mềm (Gaussian Mixture Model / Fuzzy C-Means).</li>
+    <li><strong>Mật độ liên tục và cấu trúc 2 cụm:</strong> Do <code>Income</code> và <code>Total_Spending</code> tương quan thuận khá mượt mà không tạo thành nhiều "đảo" rời rạc, cả các thuật toán phân hoạch lẫn phân cấp đều dừng ở $K=2$. Muốn tách sâu hơn 4–5 phân khúc marketing chi tiết, cần bổ sung thêm các đặc trưng RFM (Recency–Frequency–Monetary) hoặc sở thích nhóm hàng.</li>
+  </ol>
+</section>
+
+<section id="sources">
+  <h2>13. Hồ sơ nguồn đối chiếu và mức độ tin cậy kết luận</h2>
+  <p>Theo nguyên tắc minh bạch chứng cứ, toàn bộ con số trong báo cáo này có thể kiểm tra chéo trực tiếp tại các tệp nguồn trong repository:</p>
+  <div class="table-wrap">
+    <table>
+      <caption>Bảng truy nguyên nguồn số liệu và đánh giá mức độ tin cậy của từng kết luận</caption>
+      <thead>
+        <tr>
+          <th>Kết luận / Nhóm số liệu</th>
+          <th>Tệp nguồn trực tiếp trong repo</th>
+          <th>Mức độ kiểm chứng</th>
+          <th>Phạm vi áp dụng hợp lệ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Kiểm toán dữ liệu thô, loại 4 dị biệt, điền trung vị 51.650,50</td>
+          <td><code>src/data/loader.py</code>, <code>preprocessing.py</code>, <code>raw_data_audit.csv</code>, <code>train_iqr_audit.csv</code></td>
+          <td>Cao (kiểm chứng bởi <code>tests/test_data.py</code>)</td>
+          <td>Trên tập <code>marketing_campaign.csv</code> với mốc năm 2014</td>
+        </tr>
+        <tr>
+          <td>Lựa chọn <code>StandardScaler</code> thay cho <code>MinMaxScaler</code> và <code>RobustScaler</code></td>
+          <td><code>src/features/scaling.py</code>, <code>scaler_comparison.csv</code>, <code>scaler_verification.csv</code>, <code>scaler_clustering_comparison.csv</code></td>
+          <td>Cao (có đối chiếu định lượng cả 3 scaler trên Train &amp; Test)</td>
+          <td>Trên không gian 3 đặc trưng thô chưa biến đổi log</td>
+        </tr>
+        <tr>
+          <td>Cấu trúc tối ưu tại $K = 2$ (<code>K-Means</code> dẫn đầu với Silhouette <code>0,4119</code>)</td>
+          <td><code>kmeans_k_search.csv</code>, <code>hierarchical_k_search.csv</code>, <code>kmedoids_k_search.csv</code>, <code>model_comparison.csv</code></td>
+          <td>Cao (đồng thuận độc lập giữa cả 3 thuật toán khoảng cách)</td>
+          <td>Chỉ khẳng định trên 3 chiều <code>[Age, Income, Total_Spending]</code>; chưa đại diện nếu thêm biến RFM</td>
+        </tr>
+        <tr>
+          <td>Hiệu ứng chaining ở <code>complete</code>/<code>average</code> &amp; mật độ liên tục ở DBSCAN</td>
+          <td><code>hierarchical_cophenetic.csv</code>, <code>dbscan_grid_search.csv</code></td>
+          <td>Trung bình – Cao (đã quét 3 linkage và 24 cấu hình DBSCAN)</td>
+          <td>Phạm vi lưới <code>eps ∈ [0.3..0.8]</code> trên không gian <code>StandardScaler</code></td>
+        </tr>
+        <tr>
+          <td>Phân bố cụm ổn định trên Holdout Test (448 mẫu, Silhouette <code>0,4453</code>)</td>
+          <td><code>holdout_test_evaluation.csv</code>, <code>test_predictions.csv</code></td>
+          <td>Trung bình (chứng minh ổn định tâm cụm trên dữ liệu chia 80/20 cùng nguồn)</td>
+          <td>Không dùng thay thước đo generalization của học có giám sát</td>
+        </tr>
+        <tr>
+          <td>Hồ sơ 2 phân khúc &amp; 30 điểm biên Silhouette âm</td>
+          <td><code>cluster_profiles.csv</code>, <code>final_kmeans_pipeline.pkl</code></td>
+          <td>Cao về mặt thống kê mô tả; gợi ý tiếp thị mang tính tham khảo định tính</td>
+          <td>Phục vụ minh họa diễn giải kết quả trong bài lab</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Các tài liệu bổ sung khác trong dự án gồm: <a href="../requirements_mapping.md">docs/requirements_mapping.md</a> (bảng đối chiếu yêu cầu đề bài) và <a href="../../README.md">README.md</a>.</p>
+</section>
+
+<footer>
+  <p>Báo cáo thực hành môn Học máy – Practice Exercise 3: Phân cụm khách hàng (Customer Clustering). Số liệu đối chiếu trực tiếp từ mã nguồn và thư mục <code>results/</code> trong bài lab.</p>
+</footer>
+
+</div>
+</body>
+</html>
