@@ -9,7 +9,6 @@ và lưu trữ vào file trong thư mục results/metrics/pipeline_execution.log
 
 import sys
 import logging
-from pathlib import Path
 from src.config import METRICS_DIR
 
 

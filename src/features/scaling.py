@@ -40,9 +40,9 @@ def _extract_valid_matrix(
     if df.empty:
         raise ValueError("DataFrame đầu vào đang rỗng, không thể chuẩn hóa.")
 
-    cot_thieu = [col for col in feature_cols if col not in df.columns]
-    if cot_thieu:
-        raise KeyError(f"Thiếu cột đặc trưng để chuẩn hóa: {cot_thieu}")
+    missing_cols = [col for col in feature_cols if col not in df.columns]
+    if missing_cols:
+        raise KeyError(f"Thiếu cột đặc trưng để chuẩn hóa: {missing_cols}")
 
     if encode_gender:
         raise ValueError(
@@ -50,10 +50,10 @@ def _extract_valid_matrix(
             "không tự tạo cột giả khi chuẩn hóa."
         )
 
-    ma_tran = df[feature_cols].to_numpy(dtype=np.float64)
-    if not np.all(np.isfinite(ma_tran)):
+    matrix = df[feature_cols].to_numpy(dtype=np.float64)
+    if not np.all(np.isfinite(matrix)):
         raise ValueError("Dữ liệu đặc trưng chứa NaN hoặc Inf. Hãy làm sạch trước khi chuẩn hóa.")
-    return ma_tran
+    return matrix
 
 
 class FeatureScaler:
@@ -70,14 +70,14 @@ class FeatureScaler:
         """
         Khởi tạo bộ chuẩn hóa theo phương pháp ('standard', 'minmax' hoặc 'robust').
         """
-        ten_phuong_phap = method.lower().strip()
-        if ten_phuong_phap not in _SCALER_FACTORY:
+        normalized_method = method.lower().strip()
+        if normalized_method not in _SCALER_FACTORY:
             raise ValueError(
                 f"Phương pháp chuẩn hóa '{method}' không hợp lệ. "
                 f"Chỉ hỗ trợ: {list(_SCALER_FACTORY.keys())}."
             )
 
-        self.method = ten_phuong_phap
+        self.method = normalized_method
         self.feature_cols = list(feature_cols) if feature_cols is not None else list(NUMERICAL_FEATURES)
         if ID_COLUMN in self.feature_cols:
             raise ValueError(f"Không được đưa cột định danh '{ID_COLUMN}' vào danh sách đặc trưng cần chuẩn hóa.")
@@ -90,22 +90,22 @@ class FeatureScaler:
         """
         Học tham số chuẩn hóa (Mean/Std hoặc Min/Max) chỉ trên tập Train.
         """
-        ma_tran = _extract_valid_matrix(df, self.feature_cols, self.encode_gender)
+        matrix = _extract_valid_matrix(df, self.feature_cols, self.encode_gender)
 
         # Kiểm tra cột hằng số (phương sai bằng 0) trước khi fit
-        phuong_sai = np.var(ma_tran, axis=0)
-        cot_hang_so = [
-            col for col, var in zip(self.feature_cols, phuong_sai) if np.isclose(var, 0.0)
+        variances = np.var(matrix, axis=0)
+        constant_cols = [
+            col for col, var in zip(self.feature_cols, variances) if np.isclose(var, 0.0)
         ]
-        if cot_hang_so:
+        if constant_cols:
             raise ValueError(
-                f"Phát hiện cột hằng số (phương sai = 0): {cot_hang_so}. "
+                f"Phát hiện cột hằng số (phương sai = 0): {constant_cols}. "
                 "Cột không mang thông tin phân biệt cho phân cụm."
             )
 
-        self.train_min_ = np.min(ma_tran, axis=0)
-        self.train_max_ = np.max(ma_tran, axis=0)
-        self.scaler.fit(ma_tran)
+        self.train_min_ = np.min(matrix, axis=0)
+        self.train_max_ = np.max(matrix, axis=0)
+        self.scaler.fit(matrix)
         self.is_fitted_ = True
         print(f" [CHUẨN HÓA] Đã fit {self.method.upper()} scaler trên {len(df):,} mẫu với {len(self.feature_cols)} đặc trưng.")
         return self
@@ -117,11 +117,11 @@ class FeatureScaler:
         if not self.is_fitted_:
             raise RuntimeError("FeatureScaler chưa được fit. Hãy gọi fit() trên tập Train trước khi transform().")
 
-        ma_tran = _extract_valid_matrix(df, self.feature_cols, self.encode_gender)
-        ket_qua = self.scaler.transform(ma_tran)
-        if not np.all(np.isfinite(ket_qua)):
+        matrix = _extract_valid_matrix(df, self.feature_cols, self.encode_gender)
+        scaled_matrix = self.scaler.transform(matrix)
+        if not np.all(np.isfinite(scaled_matrix)):
             raise ValueError("Ma trận sau khi chuẩn hóa phát sinh giá trị NaN/Inf bất thường.")
-        return ket_qua
+        return scaled_matrix
 
     def fit_transform(self, df: pd.DataFrame) -> np.ndarray:
         """
@@ -129,13 +129,13 @@ class FeatureScaler:
         """
         return self.fit(df).transform(df)
 
-    def inverse_transform(self, ma_tran_scaled: np.ndarray) -> np.ndarray:
+    def inverse_transform(self, scaled_matrix: np.ndarray) -> np.ndarray:
         """
         Quy đổi ma trận hoặc tâm cụm từ không gian chuẩn hóa về lại đơn vị gốc.
         """
         if not self.is_fitted_:
             raise RuntimeError("FeatureScaler chưa được fit nên không thể inverse_transform.")
-        arr = np.asarray(ma_tran_scaled, dtype=np.float64)
+        arr = np.asarray(scaled_matrix, dtype=np.float64)
         if arr.ndim != 2 or arr.shape[1] != len(self.feature_cols):
             raise ValueError(
                 f"Ma trận cần inverse_transform phải có 2 chiều (*, {len(self.feature_cols)}), "
@@ -153,41 +153,41 @@ class FeatureScaler:
         if not self.is_fitted_:
             raise RuntimeError("FeatureScaler chưa được fit nên chưa có tham số đã học.")
 
-        cong_thuc_map = {
+        formula_map = {
             "standard": "Z = (x - Mean_Train) / Std_Train",
             "minmax": "X_norm = (x - Min_Train) / (Max_Train - Min_Train)",
             "robust": "X_robust = (x - Median_Train) / IQR_Train",
         }
-        cac_dong = []
-        for idx, ten_cot in enumerate(self.feature_cols):
+        param_rows = []
+        for idx, col_name in enumerate(self.feature_cols):
             if self.method == "standard":
-                tham_so_tam = float(self.scaler.mean_[idx])
-                he_so_chia = float(self.scaler.scale_[idx])
+                center_value = float(self.scaler.mean_[idx])
+                scale_value = float(self.scaler.scale_[idx])
             elif self.method == "minmax":
-                tham_so_tam = float(self.scaler.data_min_[idx])
-                he_so_chia = float(self.scaler.data_range_[idx])
+                center_value = float(self.scaler.data_min_[idx])
+                scale_value = float(self.scaler.data_range_[idx])
             else:
-                tham_so_tam = float(self.scaler.center_[idx])
-                he_so_chia = float(self.scaler.scale_[idx])
+                center_value = float(self.scaler.center_[idx])
+                scale_value = float(self.scaler.scale_[idx])
 
-            min_train = float(self.train_min_[idx]) if hasattr(self, "train_min_") else np.nan
-            max_train = float(self.train_max_[idx]) if hasattr(self, "train_max_") else np.nan
-            cac_dong.append(
+            train_min = float(self.train_min_[idx]) if hasattr(self, "train_min_") else np.nan
+            train_max = float(self.train_max_[idx]) if hasattr(self, "train_max_") else np.nan
+            param_rows.append(
                 {
                     "Phương pháp": self.method,
-                    "Đặc trưng": ten_cot,
-                    "Tham số tâm": round(tham_so_tam, 4),
-                    "Hệ số chia": round(he_so_chia, 4),
-                    "Cận Min Train": round(min_train, 4),
-                    "Cận Max Train": round(max_train, 4),
-                    "Công thức": cong_thuc_map[self.method],
+                    "Đặc trưng": col_name,
+                    "Tham số tâm": round(center_value, 4),
+                    "Hệ số chia": round(scale_value, 4),
+                    "Cận Min Train": round(train_min, 4),
+                    "Cận Max Train": round(train_max, 4),
+                    "Công thức": formula_map[self.method],
                 }
             )
-        return pd.DataFrame(cac_dong)
+        return pd.DataFrame(param_rows)
 
     def verify_scaled_matrix(
         self,
-        ma_tran_scaled: np.ndarray,
+        scaled_matrix: np.ndarray,
         is_train: bool = True,
     ) -> pd.DataFrame:
         """
@@ -196,7 +196,7 @@ class FeatureScaler:
         if not self.is_fitted_:
             raise RuntimeError("FeatureScaler chưa được fit nên không thể kiểm tra ma trận chuẩn hóa.")
 
-        arr = np.asarray(ma_tran_scaled, dtype=np.float64)
+        arr = np.asarray(scaled_matrix, dtype=np.float64)
         if arr.ndim != 2 or arr.shape[1] != len(self.feature_cols):
             raise ValueError(
                 f"Ma trận chuẩn hóa phải có shape (*, {len(self.feature_cols)}), nhận được {arr.shape}."
@@ -204,56 +204,56 @@ class FeatureScaler:
         if not np.all(np.isfinite(arr)):
             raise ValueError("Ma trận sau chuẩn hóa chứa NaN hoặc Inf.")
 
-        nhan_tap = "Train" if is_train else "Holdout Test"
-        cac_dong = []
-        for idx, ten_cot in enumerate(self.feature_cols):
-            cot = arr[:, idx]
-            gt_min = float(np.min(cot))
-            gt_max = float(np.max(cot))
-            gt_mean = float(np.mean(cot))
-            gt_std = float(np.std(cot))
-            gt_median = float(np.median(cot))
-            gt_iqr = float(np.percentile(cot, 75) - np.percentile(cot, 25))
+        split_label = "Train" if is_train else "Holdout Test"
+        audit_rows = []
+        for idx, col_name in enumerate(self.feature_cols):
+            col_values = arr[:, idx]
+            val_min = float(np.min(col_values))
+            val_max = float(np.max(col_values))
+            val_mean = float(np.mean(col_values))
+            val_std = float(np.std(col_values))
+            val_median = float(np.median(col_values))
+            val_iqr = float(np.percentile(col_values, 75) - np.percentile(col_values, 25))
 
             if self.method == "standard":
                 if is_train:
-                    dat_chuan = abs(gt_mean) < 1e-6 and abs(gt_std - 1.0) < 1e-2
-                    ghi_chu = "Mean ≈ 0, Std ≈ 1"
+                    is_passed = abs(val_mean) < 1e-6 and abs(val_std - 1.0) < 1e-2
+                    note = "Mean ≈ 0, Std ≈ 1"
                 else:
-                    dat_chuan = True
-                    ghi_chu = "Dùng tham số Mean/Std của Train"
+                    is_passed = True
+                    note = "Dùng tham số Mean/Std của Train"
             elif self.method == "minmax":
                 if is_train:
-                    dat_chuan = gt_min >= -1e-9 and gt_max <= 1.0 + 1e-9
-                    ghi_chu = "Nằm trọn trong [0, 1]"
+                    is_passed = val_min >= -1e-9 and val_max <= 1.0 + 1e-9
+                    note = "Nằm trọn trong [0, 1]"
                 else:
-                    so_ngoai_bien = int(np.sum((cot < 0.0) | (cot > 1.0)))
-                    dat_chuan = True
-                    ghi_chu = f"Ngoài [0, 1]: {so_ngoai_bien} mẫu"
+                    out_of_range_count = int(np.sum((col_values < 0.0) | (col_values > 1.0)))
+                    is_passed = True
+                    note = f"Ngoài [0, 1]: {out_of_range_count} mẫu"
             else:
                 if is_train:
-                    dat_chuan = abs(gt_median) < 1e-6
-                    ghi_chu = "Median ≈ 0, chuẩn hóa theo IQR"
+                    is_passed = abs(val_median) < 1e-6
+                    note = "Median ≈ 0, chuẩn hóa theo IQR"
                 else:
-                    dat_chuan = True
-                    ghi_chu = "Dùng tham số Median/IQR của Train"
+                    is_passed = True
+                    note = "Dùng tham số Median/IQR của Train"
 
-            cac_dong.append(
+            audit_rows.append(
                 {
-                    "Tập dữ liệu": nhan_tap,
+                    "Tập dữ liệu": split_label,
                     "Phương pháp": self.method,
-                    "Đặc trưng": ten_cot,
-                    "Min": round(gt_min, 4),
-                    "Max": round(gt_max, 4),
-                    "Mean": round(gt_mean, 4),
-                    "Std": round(gt_std, 4),
-                    "Median": round(gt_median, 4),
-                    "IQR": round(gt_iqr, 4),
-                    "Hậu kiểm": ghi_chu,
-                    "Đạt chuẩn": bool(dat_chuan),
+                    "Đặc trưng": col_name,
+                    "Min": round(val_min, 4),
+                    "Max": round(val_max, 4),
+                    "Mean": round(val_mean, 4),
+                    "Std": round(val_std, 4),
+                    "Median": round(val_median, 4),
+                    "IQR": round(val_iqr, 4),
+                    "Hậu kiểm": note,
+                    "Đạt chuẩn": bool(is_passed),
                 }
             )
-        return pd.DataFrame(cac_dong)
+        return pd.DataFrame(audit_rows)
 
 
 def compare_scalers(
@@ -264,40 +264,40 @@ def compare_scalers(
     So sánh thống kê phân phối (Min, Max, Mean, Std, Median, IQR, Skew)
     giữa dữ liệu gốc, StandardScaler, MinMaxScaler và RobustScaler.
     """
-    cot_hop_le = [col for col in feature_cols if col in df.columns]
-    if not cot_hop_le:
+    valid_cols = [col for col in feature_cols if col in df.columns]
+    if not valid_cols:
         raise KeyError(f"Không tìm thấy đặc trưng nào trong {feature_cols} để so sánh chuẩn hóa.")
 
-    ma_tran_goc = _extract_valid_matrix(df, cot_hop_le)
-    du_lieu_theo_phuong_phap = {
-        "Gốc (Raw)": ma_tran_goc,
-        "StandardScaler": FeatureScaler(method="standard", feature_cols=cot_hop_le).fit_transform(df),
-        "MinMaxScaler": FeatureScaler(method="minmax", feature_cols=cot_hop_le).fit_transform(df),
-        "RobustScaler": FeatureScaler(method="robust", feature_cols=cot_hop_le).fit_transform(df),
+    raw_matrix = _extract_valid_matrix(df, valid_cols)
+    matrices_by_method = {
+        "Gốc (Raw)": raw_matrix,
+        "StandardScaler": FeatureScaler(method="standard", feature_cols=valid_cols).fit_transform(df),
+        "MinMaxScaler": FeatureScaler(method="minmax", feature_cols=valid_cols).fit_transform(df),
+        "RobustScaler": FeatureScaler(method="robust", feature_cols=valid_cols).fit_transform(df),
     }
 
-    danh_sach_dong = []
-    for ten_pp, mang_gt in du_lieu_theo_phuong_phap.items():
-        for chi_so, ten_cot in enumerate(cot_hop_le):
-            cot_gt = mang_gt[:, chi_so]
-            do_lech = float(pd.Series(cot_gt).skew())
-            danh_sach_dong.append(
+    summary_rows = []
+    for method_label, method_matrix in matrices_by_method.items():
+        for col_idx, col_name in enumerate(valid_cols):
+            col_values = method_matrix[:, col_idx]
+            skewness = float(pd.Series(col_values).skew())
+            summary_rows.append(
                 {
-                    "Phương pháp": ten_pp,
-                    "Đặc trưng": ten_cot,
-                    "Min": round(float(np.min(cot_gt)), 4),
-                    "Max": round(float(np.max(cot_gt)), 4),
-                    "Mean": round(float(np.mean(cot_gt)), 4),
-                    "Std": round(float(np.std(cot_gt)), 4),
-                    "Median": round(float(np.median(cot_gt)), 4),
-                    "IQR": round(float(np.percentile(cot_gt, 75) - np.percentile(cot_gt, 25)), 4),
-                    "Skew": 0.0 if np.isnan(do_lech) else round(do_lech, 4),
+                    "Phương pháp": method_label,
+                    "Đặc trưng": col_name,
+                    "Min": round(float(np.min(col_values)), 4),
+                    "Max": round(float(np.max(col_values)), 4),
+                    "Mean": round(float(np.mean(col_values)), 4),
+                    "Std": round(float(np.std(col_values)), 4),
+                    "Median": round(float(np.median(col_values)), 4),
+                    "IQR": round(float(np.percentile(col_values, 75) - np.percentile(col_values, 25)), 4),
+                    "Skew": 0.0 if np.isnan(skewness) else round(skewness, 4),
                 }
             )
 
-    bang_so_sanh = pd.DataFrame(danh_sach_dong)
-    print(f" [SO SÁNH SCALER] Đã tổng hợp chỉ số cho {len(cot_hop_le)} đặc trưng qua 4 trạng thái thang đo (Raw, Standard, MinMax, Robust).")
-    return bang_so_sanh
+    comparison_df = pd.DataFrame(summary_rows)
+    print(f" [SO SÁNH SCALER] Đã tổng hợp chỉ số cho {len(valid_cols)} đặc trưng qua 4 trạng thái thang đo (Raw, Standard, MinMax, Robust).")
+    return comparison_df
 
 
 def evaluate_scalers_on_clustering(
@@ -312,81 +312,81 @@ def evaluate_scalers_on_clustering(
     Khảo sát thực nghiệm tác động của 3 bộ chuẩn hóa (Standard, MinMax, Robust) lên chất lượng phân cụm K-Means
     khi giữ cố định tập khách hàng, danh sách đặc trưng và thuật toán khởi tạo k-means++.
     """
-    cot_hop_le = [col for col in feature_cols if col in train_df.columns]
-    if not cot_hop_le:
+    valid_cols = [col for col in feature_cols if col in train_df.columns]
+    if not valid_cols:
         raise KeyError(f"Không tìm thấy đặc trưng nào trong {feature_cols} để đánh giá scaler.")
 
-    cac_phuong_phap = ["standard", "minmax", "robust"]
-    danh_sach_dong = []
-    so_diem_duy_nhat = len(np.unique(_extract_valid_matrix(train_df, cot_hop_le), axis=0))
-    cac_k_hop_le = [int(k) for k in k_range if 2 <= int(k) < so_diem_duy_nhat]
-    if not cac_k_hop_le:
+    methods = ["standard", "minmax", "robust"]
+    evaluation_rows = []
+    unique_points_count = len(np.unique(_extract_valid_matrix(train_df, valid_cols), axis=0))
+    valid_k_values = [int(k) for k in k_range if 2 <= int(k) < unique_points_count]
+    if not valid_k_values:
         raise ValueError("Không đủ số điểm phân biệt trên tập Train để tìm cụm K >= 2.")
 
-    for ten_pp in cac_phuong_phap:
-        scaler = FeatureScaler(method=ten_pp, feature_cols=cot_hop_le).fit(train_df)
-        x_train = scaler.transform(train_df)
+    for method_name in methods:
+        scaler = FeatureScaler(method=method_name, feature_cols=valid_cols).fit(train_df)
+        scaled_train = scaler.transform(train_df)
 
-        k_tot_nhat = cac_k_hop_le[0]
-        sil_tot_nhat = -1.0
-        mo_hinh_tot_nhat = None
-        nhan_tot_nhat = None
+        best_k = valid_k_values[0]
+        best_sil = -1.0
+        best_model = None
+        best_labels = None
 
-        for k in cac_k_hop_le:
+        for k in valid_k_values:
             km = KMeans(n_clusters=k, init="k-means++", n_init=10, random_state=random_state)
-            nhan = km.fit_predict(x_train)
-            sil = float(silhouette_score(x_train, nhan))
-            if sil > sil_tot_nhat:
-                sil_tot_nhat = sil
-                k_tot_nhat = k
-                mo_hinh_tot_nhat = km
-                nhan_tot_nhat = nhan
+            labels = km.fit_predict(scaled_train)
+            sil_score = float(silhouette_score(scaled_train, labels))
+            if sil_score > best_sil:
+                best_sil = sil_score
+                best_k = k
+                best_model = km
+                best_labels = labels
 
-        so_luong_cum = pd.Series(nhan_tot_nhat).value_counts()
-        ty_le_can_bang = round(float(so_luong_cum.min() / max(so_luong_cum.max(), 1)), 4)
+        cluster_counts = pd.Series(best_labels).value_counts()
+        balance_ratio = round(float(cluster_counts.min() / max(cluster_counts.max(), 1)), 4)
 
-        sil_co_dinh = np.nan
-        dbi_co_dinh = np.nan
-        if 2 <= fixed_k < so_diem_duy_nhat:
-            km_fixed = KMeans(
+        fixed_sil = np.nan
+        fixed_dbi = np.nan
+        if 2 <= fixed_k < unique_points_count:
+            fixed_km = KMeans(
                 n_clusters=fixed_k,
                 init="k-means++",
                 n_init=10,
                 random_state=random_state,
             )
-            nhan_fixed = km_fixed.fit_predict(x_train)
-            sil_co_dinh = round(float(silhouette_score(x_train, nhan_fixed)), 4)
-            dbi_co_dinh = round(float(davies_bouldin_score(x_train, nhan_fixed)), 4)
+            fixed_labels = fixed_km.fit_predict(scaled_train)
+            fixed_sil = round(float(silhouette_score(scaled_train, fixed_labels)), 4)
+            fixed_dbi = round(float(davies_bouldin_score(scaled_train, fixed_labels)), 4)
 
-        sil_test = np.nan
-        so_test_vuot_can = 0
+        test_sil = np.nan
+        test_out_of_bounds_count = 0
         if test_df is not None and not test_df.empty:
-            x_test = scaler.transform(test_df)
-            nhan_test = mo_hinh_tot_nhat.predict(x_test)
-            if len(np.unique(nhan_test)) >= 2 and len(x_test) > len(np.unique(nhan_test)):
-                sil_test = round(float(silhouette_score(x_test, nhan_test)), 4)
-            x_train_min = np.min(x_train, axis=0)
-            x_train_max = np.max(x_train, axis=0)
-            so_test_vuot_can = int(
-                np.sum(np.any((x_test < x_train_min) | (x_test > x_train_max), axis=1))
+            scaled_test = scaler.transform(test_df)
+            test_labels = best_model.predict(scaled_test)
+            if len(np.unique(test_labels)) >= 2 and len(scaled_test) > len(np.unique(test_labels)):
+                test_sil = round(float(silhouette_score(scaled_test, test_labels)), 4)
+            train_scaled_min = np.min(scaled_train, axis=0)
+            train_scaled_max = np.max(scaled_train, axis=0)
+            test_out_of_bounds_count = int(
+                np.sum(np.any((scaled_test < train_scaled_min) | (scaled_test > train_scaled_max), axis=1))
             )
 
-        danh_sach_dong.append(
+        evaluation_rows.append(
             {
-                "Scaler": ten_pp,
-                "K tối ưu": int(k_tot_nhat),
-                "Silhouette Train": round(sil_tot_nhat, 4),
-                "DBI Train": round(float(davies_bouldin_score(x_train, nhan_tot_nhat)), 4),
-                "CHI Train": round(float(calinski_harabasz_score(x_train, nhan_tot_nhat)), 2),
-                "Inertia Train": round(float(mo_hinh_tot_nhat.inertia_), 2),
-                "Cân bằng cụm": ty_le_can_bang,
-                f"Silhouette K={fixed_k}": sil_co_dinh,
-                f"DBI K={fixed_k}": dbi_co_dinh,
-                "Silhouette Test": sil_test,
-                "Mẫu Test vượt cận Train": so_test_vuot_can,
+                "Scaler": method_name,
+                "K tối ưu": int(best_k),
+                "Silhouette Train": round(best_sil, 4),
+                "DBI Train": round(float(davies_bouldin_score(scaled_train, best_labels)), 4),
+                "CHI Train": round(float(calinski_harabasz_score(scaled_train, best_labels)), 2),
+                "Inertia Train": round(float(best_model.inertia_), 2),
+                "Cân bằng cụm": balance_ratio,
+                f"Silhouette K={fixed_k}": fixed_sil,
+                f"DBI K={fixed_k}": fixed_dbi,
+                "Silhouette Test": test_sil,
+                "Mẫu Test vượt cận Train": test_out_of_bounds_count,
             }
         )
 
-    bang_danh_gia = pd.DataFrame(danh_sach_dong)
-    print(f" [ĐỐI CHIẾU SCALER TRÊN K-MEANS] Đã so sánh thực nghiệm 3 scaler qua dải K={cac_k_hop_le}.")
-    return bang_danh_gia
+    evaluation_df = pd.DataFrame(evaluation_rows)
+    print(f" [ĐỐI CHIẾU SCALER TRÊN K-MEANS] Đã so sánh thực nghiệm 3 scaler qua dải K={valid_k_values}.")
+    return evaluation_df

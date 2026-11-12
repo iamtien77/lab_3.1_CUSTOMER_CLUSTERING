@@ -35,17 +35,17 @@ def add_derived_features(
     """
     Tính toán hai đặc trưng phục vụ phân cụm: Age và Total_Spending (không sửa bản gốc).
     """
-    ket_qua = df.copy()
-    if YEAR_BIRTH_COLUMN in ket_qua.columns:
-        nam_sinh = pd.to_numeric(ket_qua[YEAR_BIRTH_COLUMN], errors="coerce")
-        ket_qua[AGE_COLUMN] = reference_year - nam_sinh
+    result_df = df.copy()
+    if YEAR_BIRTH_COLUMN in result_df.columns:
+        year_birth = pd.to_numeric(result_df[YEAR_BIRTH_COLUMN], errors="coerce")
+        result_df[AGE_COLUMN] = reference_year - year_birth
 
-    if all(col in ket_qua.columns for col in SPENDING_COMPONENT_COLUMNS):
+    if all(col in result_df.columns for col in SPENDING_COMPONENT_COLUMNS):
         for col in SPENDING_COMPONENT_COLUMNS:
-            ket_qua[col] = pd.to_numeric(ket_qua[col], errors="coerce").fillna(0.0)
-        ket_qua[SPENDING_COLUMN] = ket_qua[SPENDING_COMPONENT_COLUMNS].sum(axis=1)
+            result_df[col] = pd.to_numeric(result_df[col], errors="coerce").fillna(0.0)
+        result_df[SPENDING_COLUMN] = result_df[SPENDING_COMPONENT_COLUMNS].sum(axis=1)
 
-    return ket_qua
+    return result_df
 
 
 def filter_invalid_records(
@@ -57,44 +57,44 @@ def filter_invalid_records(
     (năm sinh < 1920 hoặc > REFERENCE_YEAR, thu nhập lỗi, chi tiêu âm).
     Hàm chỉ lọc theo điều kiện cố định từng dòng nên không gây rò rỉ dữ liệu giữa Train và Test.
     """
-    ket_qua = df.copy()
-    so_ban_dau = len(ket_qua)
+    result_df = df.copy()
+    initial_count = len(result_df)
 
-    if ID_COLUMN in ket_qua.columns:
-        ket_qua = ket_qua.drop_duplicates(subset=[ID_COLUMN], keep="first")
+    if ID_COLUMN in result_df.columns:
+        result_df = result_df.drop_duplicates(subset=[ID_COLUMN], keep="first")
 
-    if YEAR_BIRTH_COLUMN in ket_qua.columns:
-        nam_sinh = pd.to_numeric(ket_qua[YEAR_BIRTH_COLUMN], errors="coerce")
-        ket_qua = ket_qua[
-            nam_sinh.isna()
-            | ((nam_sinh >= MIN_VALID_YEAR_BIRTH) & (nam_sinh <= REFERENCE_YEAR))
+    if YEAR_BIRTH_COLUMN in result_df.columns:
+        year_birth = pd.to_numeric(result_df[YEAR_BIRTH_COLUMN], errors="coerce")
+        result_df = result_df[
+            year_birth.isna()
+            | ((year_birth >= MIN_VALID_YEAR_BIRTH) & (year_birth <= REFERENCE_YEAR))
         ]
-    elif AGE_COLUMN in ket_qua.columns:
-        tuoi = pd.to_numeric(ket_qua[AGE_COLUMN], errors="coerce")
-        tuoi_toi_da = REFERENCE_YEAR - MIN_VALID_YEAR_BIRTH
-        ket_qua = ket_qua[tuoi.isna() | ((tuoi > 0) & (tuoi <= tuoi_toi_da))]
+    elif AGE_COLUMN in result_df.columns:
+        age = pd.to_numeric(result_df[AGE_COLUMN], errors="coerce")
+        max_valid_age = REFERENCE_YEAR - MIN_VALID_YEAR_BIRTH
+        result_df = result_df[age.isna() | ((age > 0) & (age <= max_valid_age))]
 
-    if INCOME_COLUMN in ket_qua.columns:
-        thu_nhap = pd.to_numeric(ket_qua[INCOME_COLUMN], errors="coerce")
-        hop_le_thu_nhap = thu_nhap.isna() | (
-            (thu_nhap >= 0) & (thu_nhap <= MAX_VALID_INCOME)
+    if INCOME_COLUMN in result_df.columns:
+        income = pd.to_numeric(result_df[INCOME_COLUMN], errors="coerce")
+        valid_income_mask = income.isna() | (
+            (income >= 0) & (income <= MAX_VALID_INCOME)
         )
-        ket_qua = ket_qua[hop_le_thu_nhap]
+        result_df = result_df[valid_income_mask]
 
     for col in SPENDING_COMPONENT_COLUMNS:
-        if col in ket_qua.columns:
-            chi_tieu = pd.to_numeric(ket_qua[col], errors="coerce")
-            ket_qua = ket_qua[chi_tieu.isna() | (chi_tieu >= 0)]
+        if col in result_df.columns:
+            spending = pd.to_numeric(result_df[col], errors="coerce")
+            result_df = result_df[spending.isna() | (spending >= 0)]
 
-    if SPENDING_COLUMN in ket_qua.columns:
-        tong_chi = pd.to_numeric(ket_qua[SPENDING_COLUMN], errors="coerce")
-        ket_qua = ket_qua[tong_chi.isna() | (tong_chi >= 0)]
+    if SPENDING_COLUMN in result_df.columns:
+        total_spending = pd.to_numeric(result_df[SPENDING_COLUMN], errors="coerce")
+        result_df = result_df[total_spending.isna() | (total_spending >= 0)]
 
-    so_da_loai = so_ban_dau - len(ket_qua)
-    if so_da_loai > 0:
-        print(f" [LỌC BẢN GHI BẤT HỢP LÝ] Đã loại {so_da_loai} dòng nhiễu cực đoan/trùng lặp.")
+    removed_count = initial_count - len(result_df)
+    if removed_count > 0:
+        print(f" [LỌC BẢN GHI BẤT HỢP LÝ] Đã loại {removed_count} dòng nhiễu cực đoan/trùng lặp.")
 
-    return ket_qua if preserve_index else ket_qua.reset_index(drop=True)
+    return result_df if preserve_index else result_df.reset_index(drop=True)
 
 
 def clean_data(
@@ -108,44 +108,44 @@ def clean_data(
     Làm sạch dữ liệu: ép kiểu số, lọc bản ghi lỗi miền (nếu bật), tạo Age/Total_Spending và điền giá trị thiếu.
     Khi chạy trên tập Test, cần truyền fill_medians tính từ tập Train để tránh Data Leakage.
     """
-    ket_qua = (
+    result_df = (
         filter_invalid_records(df, preserve_index=preserve_index)
         if drop_invalid_outliers
         else df.copy()
     )
     if derive_features:
-        ket_qua = add_derived_features(ket_qua)
+        result_df = add_derived_features(result_df)
 
     # Ép kiểu numeric an toàn cho các đặc trưng phân cụm
     for col in NUMERICAL_FEATURES:
-        if col in ket_qua.columns:
-            ket_qua[col] = pd.to_numeric(ket_qua[col], errors="coerce")
+        if col in result_df.columns:
+            result_df[col] = pd.to_numeric(result_df[col], errors="coerce")
 
     # Điền giá trị khuyết ở các đặc trưng số bằng trung vị (từ Train hoặc từ chính df)
     for col in NUMERICAL_FEATURES:
-        if col not in ket_qua.columns or not ket_qua[col].isnull().any():
+        if col not in result_df.columns or not result_df[col].isnull().any():
             continue
-        gia_tri_dien = (
+        fill_value = (
             fill_medians[col]
             if fill_medians is not None and col in fill_medians
-            else float(ket_qua[col].median())
+            else float(result_df[col].median())
         )
-        if not pd.notna(gia_tri_dien):
+        if not pd.notna(fill_value):
             raise ValueError(
                 f"Cột '{col}' chỉ chứa giá trị thiếu (NaN) và không có trung vị hợp lệ để điền."
             )
-        so_o_thieu = int(ket_qua[col].isnull().sum())
-        ket_qua[col] = ket_qua[col].fillna(gia_tri_dien)
-        print(f" [XỬ LÝ KHUYẾT] Cột '{col}': đã điền {so_o_thieu} giá trị thiếu bằng trung vị ({gia_tri_dien:,.2f}).")
+        missing_count = int(result_df[col].isnull().sum())
+        result_df[col] = result_df[col].fillna(fill_value)
+        print(f" [XỬ LÝ KHUYẾT] Cột '{col}': đã điền {missing_count} giá trị thiếu bằng trung vị ({fill_value:,.2f}).")
 
     # Điền mode cho các cột phân loại phục vụ mô tả hồ sơ khách hàng
     for col in CATEGORICAL_PROFILE_COLUMNS:
-        if col in ket_qua.columns and ket_qua[col].isnull().any():
-            gia_tri_pho_bien = ket_qua[col].mode(dropna=True)
-            if not gia_tri_pho_bien.empty:
-                ket_qua[col] = ket_qua[col].fillna(gia_tri_pho_bien.iloc[0])
+        if col in result_df.columns and result_df[col].isnull().any():
+            mode_values = result_df[col].mode(dropna=True)
+            if not mode_values.empty:
+                result_df[col] = result_df[col].fillna(mode_values.iloc[0])
 
-    return ket_qua if preserve_index else ket_qua.reset_index(drop=True)
+    return result_df if preserve_index else result_df.reset_index(drop=True)
 
 
 def compute_train_medians(
@@ -156,13 +156,13 @@ def compute_train_medians(
     Tính trung vị của các cột số chỉ trên tập Train để dùng lại khi làm sạch tập Test.
     """
     df_features = add_derived_features(train_df)
-    ket_qua: Dict[str, float] = {}
+    medians: Dict[str, float] = {}
     for col in numerical_cols:
         if col in df_features.columns:
             series = pd.to_numeric(df_features[col], errors="coerce").dropna()
             if not series.empty:
-                ket_qua[col] = float(series.median())
-    return ket_qua
+                medians[col] = float(series.median())
+    return medians
 
 
 def audit_missing_and_outliers(
@@ -172,31 +172,31 @@ def audit_missing_and_outliers(
     """
     Kiểm toán giá trị khuyết (Null) và ngoại lai theo quy tắc IQR (Tukey's Fences) cho từng cột số.
     """
-    df_kiem_toan = add_derived_features(df)
-    tong_dong = max(len(df_kiem_toan), 1)
-    danh_sach_bao_cao = []
+    audited_df = add_derived_features(df)
+    total_rows = max(len(audited_df), 1)
+    report_rows = []
 
     for col in numerical_cols:
-        if col not in df_kiem_toan.columns:
+        if col not in audited_df.columns:
             continue
-        series = pd.to_numeric(df_kiem_toan[col], errors="coerce")
+        series = pd.to_numeric(audited_df[col], errors="coerce")
         null_count = int(series.isnull().sum())
-        null_pct = round(null_count / tong_dong * 100.0, 2)
+        null_pct = round(null_count / total_rows * 100.0, 2)
 
-        hop_le = series.dropna()
-        if hop_le.empty:
+        valid_series = series.dropna()
+        if valid_series.empty:
             continue
 
-        q1 = float(hop_le.quantile(0.25))
-        q3 = float(hop_le.quantile(0.75))
+        q1 = float(valid_series.quantile(0.25))
+        q3 = float(valid_series.quantile(0.75))
         iqr = q3 - q1
-        nguong_duoi = q1 - 1.5 * iqr
-        nguong_tren = q3 + 1.5 * iqr
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
 
-        ngoai_lai = int(((hop_le < nguong_duoi) | (hop_le > nguong_tren)).sum())
-        ty_le_ngoai_lai = round(ngoai_lai / len(hop_le) * 100.0, 2)
+        outlier_count = int(((valid_series < lower_bound) | (valid_series > upper_bound)).sum())
+        outlier_pct = round(outlier_count / len(valid_series) * 100.0, 2)
 
-        danh_sach_bao_cao.append(
+        report_rows.append(
             {
                 "Đặc trưng": col,
                 "Null Count": null_count,
@@ -204,13 +204,13 @@ def audit_missing_and_outliers(
                 "Q1": round(q1, 2),
                 "Q3": round(q3, 2),
                 "IQR": round(iqr, 2),
-                "Ngưỡng dưới": round(nguong_duoi, 2),
-                "Ngưỡng trên": round(nguong_tren, 2),
-                "Số lượng Outlier": ngoai_lai,
-                "Tỷ lệ Outlier %": ty_le_ngoai_lai,
+                "Ngưỡng dưới": round(lower_bound, 2),
+                "Ngưỡng trên": round(upper_bound, 2),
+                "Số lượng Outlier": outlier_count,
+                "Tỷ lệ Outlier %": outlier_pct,
             }
         )
 
-    bao_cao_df = pd.DataFrame(danh_sach_bao_cao)
-    print(f" [KIỂM TOÁN DỮ LIỆU] Đã hoàn tất thống kê Null & IQR Outliers cho {len(bao_cao_df)} đặc trưng.")
-    return bao_cao_df
+    report_df = pd.DataFrame(report_rows)
+    print(f" [KIỂM TOÁN DỮ LIỆU] Đã hoàn tất thống kê Null & IQR Outliers cho {len(report_df)} đặc trưng.")
+    return report_df
