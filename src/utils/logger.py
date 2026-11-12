@@ -3,7 +3,7 @@
 MODULE: TIỆN ÍCH GHI NHẬT KÝ (LOGGING UTILITIES)
 =============================================================================
 Cung cấp logger cấu hình chuẩn ghi nhật ký thực thi đồng thời ra Terminal
-và lưu trữ vào file trong thư mục results/metrics/run.log.
+và lưu trữ vào file trong thư mục results/metrics/pipeline_execution.log.
 =============================================================================
 """
 
@@ -21,7 +21,7 @@ def get_logger(name: str = "CustomerClustering") -> logging.Logger:
     - Tạo logger với định dạng: [Thời gian] [Cấp độ] [Tên module] - Nội dung thông điệp.
     - Cấu hình 2 Handler:
       1. StreamHandler: Hiển thị thông báo trực tiếp ra màn hình Console.
-      2. FileHandler: Ghi toàn bộ lịch sử chạy vào file results/metrics/run.log.
+      2. FileHandler: Ghi toàn bộ lịch sử chạy vào file results/metrics/pipeline_execution.log.
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
