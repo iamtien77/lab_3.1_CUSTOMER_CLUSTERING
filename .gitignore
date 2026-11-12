@@ -37,8 +37,5 @@ docs/*
 !docs/description_working_with_AI/
 !docs/Algrothirms/
 !docs/reports/
-data/*
-data/raw/*
-!data/raw/
 scripts/*
 .github/*
