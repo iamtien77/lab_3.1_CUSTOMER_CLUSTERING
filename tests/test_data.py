@@ -6,6 +6,8 @@ KIỂM THỬ ĐƠN VỊ: MODULE DỮ LIỆU (TEST DATA LOADER & CLEANING)
 
 import tempfile
 import unittest
+import json
+from unittest.mock import patch
 from pathlib import Path
 import pandas as pd
 
@@ -157,6 +159,30 @@ class TestDataLoader(unittest.TestCase):
         ])
         with self.assertRaises(ValueError):
             clean_data(all_nan_df)
+
+    def test_main_ingestion_removes_duplicates_before_split(self):
+        import main
+        rows = [_build_sample_customer_row(i, 1980 + i, 40000.0 + i) for i in range(5)]
+        raw = pd.DataFrame(rows + [rows[0]])
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(main, "load_raw_data", return_value=raw), \
+                patch.object(main, "METRICS_DIR", Path(tmp)), \
+                patch.object(main, "PROCESSED_DATA_DIR", Path(tmp)):
+            original, train, test = main.step_0_data_ingestion()
+        self.assertEqual(len(original), 6)
+        self.assertEqual(len(train) + len(test), 5)
+        self.assertFalse(set(train[ID_COLUMN]) & set(test[ID_COLUMN]))
+
+    def test_notebook_ingestion_rejects_missing_required_column(self):
+        notebook = Path(__file__).resolve().parents[1] / "notebooks/01_eda.ipynb"
+        cells = json.loads(notebook.read_text(encoding="utf-8"))["cells"]
+        source = next("".join(c["source"]) for c in cells
+                      if c["cell_type"] == "code" and "schema_info =" in "".join(c["source"]))
+        raw = pd.DataFrame([_build_sample_customer_row(1, 1980, 40000.0)]).drop(columns="Income")
+        namespace = {"load_raw_data": lambda _: raw, "RAW_DATA_PATH": None,
+                     "validate_schema": validate_schema}
+        with self.assertRaises(ValueError):
+            exec(source, namespace)
 
 
 if __name__ == "__main__":

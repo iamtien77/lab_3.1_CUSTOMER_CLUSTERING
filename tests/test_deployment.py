@@ -24,6 +24,71 @@ from src.models.persistence import save_model
 class TestPredictor(unittest.TestCase):
     """Kiểm thử tại seam công khai cho suy luận phân khúc khách hàng mới."""
 
+    def test_batch_rejects_invalid_domain_with_row_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._create_temp_model_bundle(Path(tmp))
+            predictor = CustomerSegmentPredictor("pipeline_test.pkl", model_dir=tmp)
+            for column, value in [("Age", -5), ("Age", 0), ("Age", 121),
+                                  ("Income", -100), ("Total_Spending", -20),
+                                  ("Income", np.inf), ("Income", "invalid")]:
+                with self.subTest(column=column, value=value):
+                    row = {"Age": 35, "Income": 50000, "Total_Spending": 300}
+                    row[column] = value
+                    with self.assertRaisesRegex(ValueError, "bad_row"):
+                        predictor.predict_batch(pd.DataFrame([row], index=["bad_row"]))
+
+    def test_batch_missing_income_requires_saved_train_median(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._create_temp_model_bundle(Path(tmp))
+            predictor = CustomerSegmentPredictor("pipeline_test.pkl", model_dir=tmp)
+            rows = pd.DataFrame({"Age": [35, 40], "Income": [np.nan, 10000],
+                                 "Total_Spending": [500, 400]})
+            for medians in [None, {}, {"Age": 35}, {"Income": np.nan}, {"Income": np.inf}]:
+                with self.subTest(medians=medians):
+                    predictor.metadata["feature_medians"] = medians
+                    with self.assertRaisesRegex(ValueError, "Income"):
+                        predictor.predict_batch(rows)
+
+    def test_batch_rejects_negative_raw_component_even_when_total_positive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._create_temp_model_bundle(Path(tmp))
+            predictor = CustomerSegmentPredictor("pipeline_test.pkl", model_dir=tmp)
+            row = {"Year_Birth": 1980, "Income": 50000, "MntWines": -10,
+                   "MntFruits": 100, "MntMeatProducts": 0, "MntFishProducts": 0,
+                   "MntSweetProducts": 0, "MntGoldProds": 0}
+            with self.assertRaisesRegex(ValueError, "bad_raw"):
+                predictor.predict_batch(pd.DataFrame([row], index=["bad_raw"]))
+
+    def test_batch_imputation_is_independent_and_complete_input_needs_no_medians(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._create_temp_model_bundle(Path(tmp))
+            predictor = CustomerSegmentPredictor("pipeline_test.pkl", model_dir=tmp)
+            rows = pd.DataFrame({"Age": [35, 40], "Income": [np.nan, 10000],
+                                 "Total_Spending": [500, 400]}, index=["target", "other"])
+            first = predictor.predict_batch(rows)
+            rows.loc["other", "Income"] = 100000
+            second = predictor.predict_batch(rows)
+            self.assertEqual(first.loc["target", "Income"], 56500)
+            self.assertEqual(first.loc["target", "Predicted_Cluster"], second.loc["target", "Predicted_Cluster"])
+            self.assertListEqual(first.index.tolist(), rows.index.tolist())
+            self.assertTrue(pd.isna(rows.loc["target", "Income"]))
+            predictor.metadata.pop("feature_medians")
+            complete = rows.loc[["other"]]
+            batch = predictor.predict_batch(complete)
+            single = predictor.predict_single_customer(40, 100000, 400)
+            self.assertEqual(batch.iloc[0]["Predicted_Cluster"], single["assigned_cluster"])
+
+    def test_batch_raw_missing_spend_uses_train_total_median(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._create_temp_model_bundle(Path(tmp))
+            predictor = CustomerSegmentPredictor("pipeline_test.pkl", model_dir=tmp)
+            row = {"Year_Birth": 1980, "Income": 50000, "MntWines": np.nan,
+                   "MntFruits": 100, "MntMeatProducts": 0, "MntFishProducts": 0,
+                   "MntSweetProducts": 0, "MntGoldProds": 0}
+            result = predictor.predict_batch(pd.DataFrame([row]))
+            self.assertEqual(result.iloc[0]["Age"], 34)
+            self.assertEqual(result.iloc[0]["Total_Spending"], predictor.metadata["feature_medians"]["Total_Spending"])
+
     def _create_temp_model_bundle(self, tmp_dir: Path) -> Path:
         """Huấn luyện nhanh mô hình K=2 và lưu vào thư mục tạm phục vụ test suy luận."""
         df_train = pd.DataFrame({

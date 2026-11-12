@@ -160,6 +160,15 @@ class TestClusteringModels(unittest.TestCase):
         with self.assertRaises(ValueError):
             KMedoidsTrainer(n_clusters=2, random_state=42).fit_predict(nan_matrix)
 
+    def test_dbscan_search_clears_previous_best_params(self):
+        matrix = np.array([[0., 0.], [0.1, 0.], [10., 10.], [10.1, 10.]])
+        trainer = DBSCANTrainer()
+        trainer.grid_search_params(matrix, [0.3], [2])
+        self.assertEqual(trainer.best_params_, (0.3, 2))
+        trainer.grid_search_params(matrix, [100.0], [2])
+        self.assertIsNone(trainer.best_params_)
+        self.assertEqual(trainer.grid_results_["eps"].tolist(), [100.0])
+
 
 if __name__ == "__main__":
     unittest.main()
