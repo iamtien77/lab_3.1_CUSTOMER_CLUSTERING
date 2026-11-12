@@ -60,9 +60,10 @@ def load_raw_data(
     return df
 
 
-def validate_schema(df: pd.DataFrame) -> Dict[str, Any]:
+def validate_schema(df: pd.DataFrame, allow_duplicate_ids: bool = False) -> Dict[str, Any]:
     """
     Kiểm tra cấu trúc cột bắt buộc, dòng trùng lặp, tính duy nhất của ID và giá trị thiếu.
+    allow_duplicate_ids=True chỉ dùng trước bước loại trùng; vẫn chặn thiếu cột/ID.
     """
     missing_columns = [col for col in REQUIRED_RAW_COLUMNS if col not in df.columns]
     duplicate_rows = int(df.duplicated().sum())
@@ -79,7 +80,7 @@ def validate_schema(df: pd.DataFrame) -> Dict[str, Any]:
     total_nulls = int(sum(null_by_column.values()))
     is_valid = (
         len(missing_columns) == 0
-        and duplicate_ids == 0
+        and (allow_duplicate_ids or duplicate_ids == 0)
         and missing_ids == 0
         and len(df) > 0
     )

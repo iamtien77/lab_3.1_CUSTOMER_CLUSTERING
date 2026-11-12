@@ -54,6 +54,8 @@ class DBSCANTrainer:
         """
         Quét lưới cặp tham số (eps, min_samples), thống kê số cụm, tỷ lệ nhiễu và Silhouette (trên điểm không nhiễu).
         """
+        self.best_params_ = None
+        self.grid_results_ = None
         matrix = np.asarray(feature_matrix, dtype=np.float64)
         grid_rows = []
 

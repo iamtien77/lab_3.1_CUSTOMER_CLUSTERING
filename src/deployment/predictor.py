@@ -15,7 +15,10 @@ from typing import Any, Dict, Optional
 import numpy as np
 import pandas as pd
 
-from src.config import AGE_COLUMN, INCOME_COLUMN, SPENDING_COLUMN
+from src.config import (
+    AGE_COLUMN, INCOME_COLUMN, SPENDING_COLUMN, NUMERICAL_FEATURES,
+    REFERENCE_YEAR, SPENDING_COMPONENT_COLUMNS, YEAR_BIRTH_COLUMN,
+)
 from src.data.preprocessing import clean_data
 from src.models.persistence import load_model
 
@@ -57,6 +60,30 @@ class CustomerSegmentPredictor:
         strategy = persona_info.get("marketing_strategy", "")
         return name, strategy
 
+    @staticmethod
+    def _numeric_column(df: pd.DataFrame, column: str) -> pd.Series:
+        """Chỉ cho phép số hữu hạn hoặc giá trị khuyết thật; báo index của dòng lỗi."""
+        values = pd.to_numeric(df[column], errors="coerce")
+        invalid = (df[column].notna() & values.isna()) | (
+            values.notna() & ~np.isfinite(values)
+        )
+        if invalid.any():
+            raise ValueError(f"Cột '{column}' không phải số hữu hạn tại index {df.index[invalid].tolist()}.")
+        return values
+
+    @classmethod
+    def _validate_features(cls, df: pd.DataFrame, allow_missing: bool = False) -> None:
+        """Dùng chung miền dữ liệu cho single/batch; không loại bỏ dòng âm thầm."""
+        for column in NUMERICAL_FEATURES:
+            if column not in df:
+                raise ValueError(f"Thiếu cột đặc trưng '{column}'.")
+            values = cls._numeric_column(df, column)
+            invalid = ((values <= 0) | (values > 120)) if column == AGE_COLUMN else values < 0
+            if not allow_missing:
+                invalid = invalid | values.isna()
+            if invalid.any():
+                raise ValueError(f"Cột '{column}' sai miền dữ liệu tại index {df.index[invalid].tolist()}.")
+
     def predict_single_customer(
         self,
         age: float,
@@ -66,13 +93,6 @@ class CustomerSegmentPredictor:
         """
         Dự đoán phân khúc và khoảng cách tới tâm cụm cho 1 khách hàng mới.
         """
-        if not np.all(np.isfinite([age, annual_income, total_spending])):
-            raise ValueError("Age, Income và Total_Spending phải là các giá trị số hữu hạn (không chứa NaN/Inf).")
-        if age <= 0 or age > 120:
-            raise ValueError(f"Độ tuổi không hợp lệ: {age}. Phải nằm trong khoảng (0, 120].")
-        if annual_income < 0 or total_spending < 0:
-            raise ValueError("Thu nhập và tổng chi tiêu không được âm.")
-
         single_row_df = pd.DataFrame(
             [
                 {
@@ -82,6 +102,7 @@ class CustomerSegmentPredictor:
                 }
             ]
         )
+        self._validate_features(single_row_df)
         scaled_matrix = self.scaler.transform(single_row_df)
         cluster_id = int(self.model.predict(scaled_matrix)[0])
 
@@ -114,13 +135,40 @@ class CustomerSegmentPredictor:
         if df_new.empty:
             raise ValueError("DataFrame khách hàng mới đang rỗng, không thể dự đoán.")
 
-        # Dùng trung vị đã lưu từ tập Train (nếu có) để điền thiếu mà không gây Data Leakage
+        prepared_df = df_new.copy()
+        if YEAR_BIRTH_COLUMN in prepared_df:
+            prepared_df[AGE_COLUMN] = self.metadata.get("reference_year", REFERENCE_YEAR) - self._numeric_column(
+                prepared_df, YEAR_BIRTH_COLUMN
+            )
+        for column in SPENDING_COMPONENT_COLUMNS:
+            if column in prepared_df:
+                values = self._numeric_column(prepared_df, column)
+                if (values < 0).any():
+                    raise ValueError(f"Cột '{column}' âm tại index {prepared_df.index[values < 0].tolist()}.")
+                prepared_df[column] = values
+        if all(column in prepared_df for column in SPENDING_COMPONENT_COLUMNS):
+            # Khoản chi khuyết không đồng nghĩa với không chi tiêu.
+            prepared_df[SPENDING_COLUMN] = prepared_df[SPENDING_COMPONENT_COLUMNS].sum(
+                axis=1, min_count=len(SPENDING_COMPONENT_COLUMNS)
+            )
+        self._validate_features(prepared_df, allow_missing=True)
         train_medians = self.metadata.get("feature_medians")
+        for column in NUMERICAL_FEATURES:
+            prepared_df[column] = self._numeric_column(prepared_df, column)
+            if prepared_df[column].isna().any():
+                try:
+                    median = float(train_medians[column])
+                except (TypeError, KeyError, ValueError):
+                    raise ValueError(f"Thiếu trung vị Train hợp lệ cho cột '{column}' trong feature_medians.") from None
+                if not np.isfinite(median):
+                    raise ValueError(f"Trung vị Train của '{column}' phải hữu hạn.")
+                prepared_df[column] = prepared_df[column].fillna(median)
+        self._validate_features(prepared_df)
         result_df = clean_data(
-            df_new,
+            prepared_df,
             fill_medians=train_medians,
             drop_invalid_outliers=False,
-            derive_features=True,
+            derive_features=False,
             preserve_index=True,
         )
         scaled_matrix = self.scaler.transform(result_df)

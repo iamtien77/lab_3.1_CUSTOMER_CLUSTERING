@@ -85,7 +85,8 @@ def step_0_data_ingestion() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     print_section("BƯỚC 0: NẠP, KIỂM ĐỊNH VÀ CHIA TẬP DỮ LIỆU (80/20)")
     raw_df = load_raw_data(RAW_DATA_PATH)
-    schema_info = validate_schema(raw_df)
+    # ID trùng được ghi nhận và loại ở bước lọc trước khi chia tập.
+    schema_info = validate_schema(raw_df, allow_duplicate_ids=True)
     if not schema_info["is_valid"]:
         raise ValueError(f"Schema dữ liệu không hợp lệ: {schema_info}")
 
