@@ -12,22 +12,20 @@
 
 ### 1.2. Dữ liệu đầu vào
 
-- Nguồn raw nội bộ: `data/raw/marketing_campaign.csv` ; đường dẫn tải gốc cần được nhóm xác minh.
-- Nhóm cần đối chiếu dữ liệu raw với đề: dữ liệu có `Year_Birth`, `Income`, các khoản chi tiêu nhưng thiếu `Gender` và `Spending Score`; không xem tổng chi tiêu là điểm chi tiêu tương đương.
-- Theo đề bài, `Age` thể hiện tuổi; `Gender` thể hiện giới tính phục vụ mô tả dữ liệu.
-- `Annual Income` thể hiện thu nhập hằng năm theo đơn vị của tập dữ liệu.
-- `Spending Score` thể hiện mức chi tiêu theo thang điểm của tập dữ liệu.
-- Mã khách hàng (`ID` trong dữ liệu raw, hoặc `CustomerID` tùy tập dữ liệu) chỉ dùng để đối chiếu bản ghi.
-- Nhóm sẽ kiểm tra tên cột, kiểu dữ liệu và đơn vị trước khi phân tích.
+- Nguồn raw nội bộ là `data/raw/marketing_campaign.csv` (dạng phân tách tab); nguồn gốc được kiểm tra schema và ý nghĩa cột trước khi xử lý.
+- Đối chiếu với yêu cầu bài tập: dữ liệu thô có `Year_Birth`, `Income` và 6 cột chi tiêu (`MntWines`, `MntFruits`, `MntMeatProducts`, `MntFishProducts`, `MntSweetProducts`, `MntGoldProds`), chưa có sẵn cột `Age`, `Gender` hay `Spending Score`.
+- Nhóm thống nhất quy đổi `Age = 2014 - Year_Birth` (lấy năm tham chiếu `2014` phù hợp khoảng năm gia nhập `Dt_Customer` 2012–2014 trong tập dữ liệu) và tính `Total_Spending` bằng tổng 6 cột chi tiêu `Mnt*` để đo mức chi tiêu của khách hàng.
+- Do không có cột `Gender`, nhóm không tự giả lập cột này mà dùng các cột nhân khẩu học sẵn có như `Education`, `Marital_Status` (cùng 6 nhóm chi tiêu thành phần) để mô tả thêm về từng cụm.
+- Mã khách hàng (`ID`) chỉ dùng để đối chiếu bản ghi và kiểm tra trùng lặp, không đưa vào tính khoảng cách; các cột phản hồi chiến dịch (`Response`, `AcceptedCmp*`) cũng không dùng làm nhãn đúng.
 
 ### 1.3. Phạm vi học tập
 
-- Nhóm thực hiện Data Exploration để hiểu đặc điểm dữ liệu.
-- Nhóm thực hiện Feature Scaling cho ba thuộc tính số.
-- Nhóm lựa chọn thuật toán phân cụm và khảo sát tham số phù hợp.
-- Nhóm xây dựng kế hoạch đánh giá bằng chỉ số và biểu đồ.
-- Phạm vi bài lab tập trung vào quá trình phân tích trên một tập dữ liệu.
-- Việc xây dựng dịch vụ trực tuyến và vận hành thực tế nằm ngoài phạm vi.
+- Nhóm thực hiện Data Exploration trên dữ liệu đã kiểm định để nắm phân phối, giá trị thiếu và ngoại lai.
+- Nhóm áp dụng tách tập `80% Train / 20% Holdout Test` trước bước điền khuyết bằng trung vị và bước chuẩn hóa nhằm tránh rò rỉ dữ liệu.
+- Nhóm thực hiện Feature Scaling cho ba thuộc tính số (`Age`, `Income`, `Total_Spending`).
+- Nhóm chọn K-Means làm baseline chính, khảo sát tham số phù hợp và đối chiếu thêm với Hierarchical Clustering, DBSCAN và K-Medoids.
+- Nhóm xây dựng kế hoạch đánh giá bằng cả chỉ số nội tại lẫn biểu đồ trực quan, kèm mô tả chân dung nhóm khách hàng theo dữ liệu.
+- Phần đóng gói mô hình và thử dự đoán mẫu chỉ phục vụ kiểm chứng cuối trong phạm vi bài lab; việc xây dựng dịch vụ trực tuyến hay vận hành thực tế nằm ngoài phạm vi.
 
 ## 2. WHY - Vì sao nhóm thực hiện bài lab?
 
@@ -81,122 +79,101 @@
 
 ### 4.2. Không gian phân tích
 
-- Nhóm dùng ba thuộc tính số làm không gian phân cụm chính.
-- Ba thuộc tính gồm tuổi, thu nhập hằng năm và điểm chi tiêu.
-- Nhóm giữ `Gender` để mô tả phân bố và tìm hiểu đặc điểm dữ liệu.
-- Nhóm không đưa thông tin định danh vào phép tính khoảng cách.
-- Biểu đồ hai chiều sẽ thể hiện từng cặp thuộc tính để hỗ trợ quan sát.
+- Nhóm dùng ba thuộc tính số làm không gian phân cụm chính: `Age`, `Income` và `Total_Spending`.
+- Nhóm giữ `Education`, `Marital_Status` cùng 6 khoản chi tiêu thành phần (`Mnt*`) để mô tả thêm đặc điểm nhóm khách hàng sau phân cụm.
+- Nhóm không đưa mã định danh `ID` hay thông tin phản hồi chiến dịch vào phép tính khoảng cách.
+- Biểu đồ hai chiều (`Income` với `Total_Spending`) và ba chiều (`Age`, `Income`, `Total_Spending`) sẽ hỗ trợ quan sát trực quan.
 
 ## 5. WHEN - Nhóm thực hiện theo trình tự nào?
 
 ### 5.1. Các giai đoạn dự kiến
 
-| Giai đoạn  | Nội dung nhóm thực hiện                       | Điều kiện chuyển bước              |
-| ------------ | ------------------------------------------------- | ---------------------------------------- |
-| Chuẩn bị   | Đọc yêu cầu và xác định các thuộc tính | Hiểu vai trò và đơn vị dữ liệu   |
-| Khám phá   | Kiểm tra thiếu, ngoại lai và phân phối      | Có phương án xử lý dữ liệu       |
-| Chuẩn hóa  | Chọn đặc trưng và phương pháp scaling     | Có dữ liệu số hợp lệ               |
-| Thử nghiệm | Thiết lập baseline và khảo sát tham số      | Các cấu hình có thể đối chiếu    |
-| Đánh giá  | Áp dụng tiêu chí và cách trực quan hóa    | Có căn cứ để diễn giải phân cụm |
+| Giai đoạn | Nội dung nhóm thực hiện | Điều kiện chuyển bước |
+|---|---|---|
+| Chuẩn bị | Kiểm tra schema, tạo đặc trưng, lọc lỗi miền và tách `80% Train / 20% Test` | Dữ liệu sạch sơ bộ, không trộn tập Test vào thống kê học |
+| Khám phá | Kiểm tra thiếu, trùng lặp 3D, phân phối và dấu hiệu ngoại lai trên tập Train | Có phương án điền khuyết từ trung vị Train và giữ ngoại lai hợp lệ |
+| Chuẩn hóa | Khảo sát scaler, fit trên Train, biến đổi Train/Test và hậu kiểm điều kiện | Ma trận Train/Test hữu hạn, không rò rỉ dữ liệu |
+| Thử nghiệm | Chạy K-Means baseline (`K=2..10`, thử siêu tham số) rồi đối chiếu Hierarchical, DBSCAN, K-Medoids | Các cấu hình cùng tập Train và cùng thang đo để so sánh công bằng |
+| Đánh giá | Tính chỉ số nội tại, đối chiếu ổn định trên Test, vẽ biểu đồ và lập hồ sơ nhóm | Có đủ căn cứ chỉ số và thống kê gốc để giải thích phân khúc |
 
 ### 5.2. Nguyên tắc sắp xếp
 
-- Nhóm kiểm tra chất lượng dữ liệu trước khi chuẩn hóa.
-- Nhóm thống nhất đặc trưng và chỉ số trước khi thử nghiệm thuật toán.
-- Nhóm thực hiện baseline trước khi cân nhắc phương án bổ sung.
-- Nhóm thay đổi có kiểm soát từng yếu tố để hiểu ảnh hưởng của lựa chọn.
-- Nhóm dành thời gian cuối buổi thực hành để rà soát giả định và hạn chế.
-- Thời lượng từng giai đoạn sẽ được nhóm điều chỉnh theo lịch học.
+- Nhóm kiểm tra chất lượng dữ liệu và chia `80/20` trước khi tính trung vị hay tham số chuẩn hóa.
+- Nhóm thống nhất đặc trưng và bộ tiêu chí đánh giá trước khi thử nghiệm thuật toán.
+- Nhóm hoàn thiện phần giải thích cho K-Means baseline trước khi đối chiếu sang các thuật toán khác.
+- Nhóm thay đổi có kiểm soát từng yếu tố (số cụm, siêu tham số, thước đo khoảng cách hoặc scaler) để thấy rõ ảnh hưởng.
+- Nhóm dành bước rà soát cuối để ghi nhận rõ giả định và giới hạn của bài lab.
+- Thời lượng từng giai đoạn được điều chỉnh linh hoạt theo tiến độ học tập.
 
 ## 6. HOW - Nhóm dự kiến thực hiện như thế nào?
 
 ### 6.1. Khám phá dữ liệu
 
-- Nhóm kiểm tra số bản ghi, số thuộc tính và kiểu dữ liệu của từng cột.
-- Nhóm thống kê số lượng và tỷ lệ giá trị thiếu theo từng thuộc tính.
-- Nhóm kiểm tra bản ghi trùng và phân biệt với khách hàng có đặc điểm giống nhau.
-- Nhóm xem xét miền giá trị của tuổi, thu nhập và điểm chi tiêu.
-- Nhóm xác minh giá trị bất hợp lý dựa trên ý nghĩa và đơn vị của thuộc tính.
-- Nhóm sử dụng Histogram để khảo sát phân phối của ba thuộc tính số.
-- Nhóm sử dụng Scatter Plot cho cặp thu nhập và điểm chi tiêu.
-- Nhóm có thể bổ sung cặp tuổi và điểm chi tiêu để mở rộng góc quan sát.
-- Nhóm sử dụng Boxplot và IQR để nhận diện các giá trị cần xem xét.
-- Giá trị ngoài khoảng IQR chỉ là dấu hiệu cần kiểm tra, không tự động bị loại.
+- Nhóm kiểm tra số dòng, số cột, kiểu dữ liệu, trùng `ID` và giá trị thiếu trên bảng dữ liệu thô ban đầu.
+- Nhóm kiểm tra các dấu hiệu lỗi nhập liệu hoặc nhãn lạ (như `Year_Birth < 1920`, `Income > 200,000`, các nhãn `Marital_Status` ít gặp như `Alone`/`Absurd`/`YOLO`, và khoảng năm gia nhập `Dt_Customer`).
+- Sau bước lọc lỗi và tách `80/20`, phần thống kê mô tả chính (`count`, `mean`, `median`, `std`, `min`, `max`, `skew`) và kiểm đếm bản ghi trùng trên 3 đặc trưng số được thực hiện trên tập Train.
+- Nhóm dùng Histogram và Boxplot/IQR để khảo sát phân phối, độ lệch (skewness) và phát hiện ngoại lai cho `Age`, `Income`, `Total_Spending`.
+- Giá trị nằm ngoài hàng rào IQR chỉ được đánh dấu để quan sát mức độ lệch phân phối, không tự động loại bỏ khi vẫn nằm trong miền khách hàng hợp lệ.
+- Nhóm dùng ma trận tương quan (Heatmap) và Scatter Plot (ưu tiên `Income` với `Total_Spending`, có thể xem thêm `Age` với `Total_Spending`) để quan sát sơ bộ các cụm tự nhiên.
 
 ### 6.2. Xử lý dữ liệu trước phân cụm
 
-- Nhóm giữ nguyên bản dữ liệu gốc để phục vụ đối chiếu.
-- Nếu thuộc tính số thiếu ít giá trị, nhóm cân nhắc điền bằng median.
-- Nếu một thuộc tính thiếu nhiều, nhóm xem lại khả năng sử dụng trước khi tiếp tục.
-- Nhóm ghi rõ lý do nếu loại bản ghi không hợp lệ hoặc trùng do nhập liệu.
-- Nhóm giữ các giá trị cực đoan hợp lệ khi chúng phản ánh khách hàng thực tế.
-- Nhóm kiểm tra lại giá trị thiếu và giá trị không hữu hạn trước khi scaling.
-- Nhóm giữ liên kết giữa từng khách hàng và dữ liệu dùng để phân tích.
+- Nhóm giữ nguyên tệp gốc trong `data/raw/` để đối chiếu khi cần, còn bản sạch lưu riêng trong `data/processed/`.
+- Nhóm tạo hai đặc trưng suy dẫn từng dòng: `Age = 2014 - Year_Birth` và `Total_Spending` bằng tổng 6 cột `Mnt*`.
+- Nhóm lọc bỏ các dòng trùng `ID` hoặc vi phạm miền hợp lý: `Year_Birth < 1920` hay `> 2014`, `Income < 0` hay `> 200,000`, và khoản chi âm.
+- Nhóm tách `80% Train / 20% Holdout Test` (với `random_state = 42`) rồi chỉ tính trung vị (`median`) của `Income` trên tập Train để điền cho phần khuyết ở cả Train và Test, tránh rò rỉ thông tin; các cột phân loại (`Education`, `Marital_Status`) điền theo giá trị phổ biến (`mode`).
+- Nhóm giữ các giá trị ngoại lai hợp lệ ngoài khoảng IQR vì đây có thể là nhóm khách hàng chi tiêu cao thật sự.
+- Trước khi chuẩn hóa, nhóm kiểm tra lại toàn bộ 3 đặc trưng số để đảm bảo không còn giá trị thiếu hay không hữu hạn.
 
 ### 6.3. Feature Scaling
 
-- Nhóm chọn StandardScaler làm phương án chuẩn hóa ban đầu.
-- StandardScaler đưa từng thuộc tính về thang đo theo trung bình và độ lệch chuẩn.
-- Nhóm dùng cùng một phương án scaling khi đối chiếu các cấu hình K-Means.
-- Nhóm kiểm tra thuộc tính có phương sai bằng không vì thuộc tính đó không phân biệt khách hàng.
-- Nhóm cân nhắc MinMaxScaler như một khảo sát bổ sung nếu thời gian cho phép.
-- MinMaxScaler đưa dữ liệu dùng để xác định phép biến đổi về khoảng xác định.
-- Cả hai phương án đều cần được xem xét khi dữ liệu có giá trị cực đoan.
-- Nhóm giữ dữ liệu theo đơn vị gốc để giải thích ý nghĩa của các đặc trưng.
+- Nhóm chọn `StandardScaler` làm phương án chuẩn hóa chính vì độ tuổi, thu nhập và tổng chi tiêu có đơn vị và độ lớn rất khác nhau.
+- Bộ chuẩn hóa chỉ được fit trên tập Train (80%), sau đó mới transform cho cả Train và Holdout Test (20%), tuyệt đối không fit trên toàn bộ tập dữ liệu.
+- Trước khi fit, nhóm kiểm tra để chắc chắn không đưa cột `ID` vào ma trận và không có thuộc tính hằng số (phương sai bằng `0`).
+- Bên cạnh `StandardScaler`, nhóm dự kiến đối chiếu thêm `MinMaxScaler` và `RobustScaler` trên cả hai khía cạnh: phân phối sau biến đổi (Min, Max, Mean, Std, Median, IQR, Skew) và hiệu quả phân cụm K-Means khi giữ cố định dữ liệu Train/Test cùng dải K.
+- Nhóm kiểm tra hậu điều kiện sau scaling trên Train (`Mean ≈ 0, Std ≈ 1` cho Standard; trong `[0, 1]` cho MinMax; `Median ≈ 0` cho Robust) và theo dõi các mẫu Test vượt cận `[0, 1]` của MinMax do ảnh hưởng của tập kiểm chứng độc lập.
+- Nhóm lưu thông tin phép biến đổi để có thể dùng `inverse_transform` quy đổi tâm cụm về đơn vị thực tế khi diễn giải.
 
 ### 6.4. Tiêu chí đánh giá dự kiến
 
-- Nhóm sử dụng Silhouette coefficient làm chỉ số đánh giá chính.
-- Silhouette phản ánh mức gắn kết trong cụm so với mức tách biệt với cụm khác.
-- Giá trị Silhouette nằm trong khoảng từ -1 đến 1; giá trị cao hơn thường thuận lợi hơn.
-- Nhóm chỉ tính Silhouette khi số nhãn cụm nằm từ 2 đến số mẫu trừ 1.
-- Nhóm kết hợp chỉ số với quy mô cụm và khả năng diễn giải đặc trưng.
-- Nhóm dùng Inertia để hỗ trợ quan sát Elbow trong các thử nghiệm K-Means.
-- Nhóm chỉ so sánh Inertia trên cùng dữ liệu, tập đặc trưng và thang đo.
-- Nhóm không chọn số cụm chỉ vì Inertia giảm khi tăng số cụm.
-- Nhóm không sử dụng Accuracy vì bài toán không cung cấp nhãn phân khúc đúng.
-- Nhóm không đặt trước một ngưỡng điểm để cam kết chất lượng phân cụm.
+- Nhóm dùng Silhouette coefficient làm chỉ số chính trên không gian đã chuẩn hóa; giá trị nằm từ `-1` đến `1` và càng cao càng cho thấy cụm gọn và tách biệt.
+- Silhouette và các chỉ số phân tách chỉ được tính khi số cụm thực tế nằm trong khoảng `2` đến `n_valid - 1`; nếu vi phạm, nhóm ghi rõ lý do không tính được thay vì gán điểm `0` giả tạo.
+- Với thuật toán mật độ có tách nhiễu (nhãn `-1`), nhóm loại các điểm nhiễu khỏi phép tính chỉ số phân tách và báo cáo riêng số lượng cùng tỷ lệ phần trăm điểm nhiễu.
+- Ngoài Silhouette, nhóm bổ sung thêm các chỉ số nội tại hỗ trợ góc nhìn đa chiều: `Davies-Bouldin` (càng thấp càng tốt), `Calinski-Harabasz` (càng cao càng tốt), `Dunn Index`, tỷ lệ điểm có Silhouette âm (%) và độ cân bằng kích thước giữa cụm nhỏ nhất và lớn nhất.
+- Nhóm dùng Inertia kết hợp biểu đồ Elbow để khảo sát K-Means, nhưng chỉ so sánh trên cùng dữ liệu, cùng đặc trưng và cùng thang đo, không dùng Inertia cho thuật toán khác hay chọn K chỉ vì Inertia giảm.
+- Nhóm không dùng Accuracy vì đây là bài toán không giám sát, và không ấn định sẵn ngưỡng điểm bắt buộc.
 
 ### 6.5. Baseline K-Means
 
-- Nhóm chọn K-Means vì cách hoạt động đơn giản và tâm cụm dễ giải thích.
-- K-Means hướng tới giảm tổng bình phương khoảng cách từ điểm tới tâm cụm.
-- Nhóm sử dụng khoảng cách Euclidean trên ba thuộc tính đã chuẩn hóa.
-- Nhóm dự kiến dùng K = 2 cho baseline ban đầu nếu dữ liệu đủ điều kiện.
-- Nhóm dự kiến khảo sát K từ 2 đến 10, giới hạn theo số mẫu và số điểm phân biệt.
-- Nhóm dùng khởi tạo k-means++ và nhiều lần khởi tạo để giảm ảnh hưởng của điểm bắt đầu.
-- Nhóm cố định random seed cho các đối chiếu cần tái lập.
-- Nhóm xem xét đồng thời Silhouette, Elbow và quy mô cụm khi chọn K.
-- K-Means phù hợp hơn khi các cụm tương đối gọn và được phân biệt bằng khoảng cách.
-- K-Means có thể bị ảnh hưởng bởi ngoại lai, cụm kéo dài hoặc mật độ khác nhau.
+- Nhóm chọn K-Means làm baseline chính vì trực quan, tính toán nhanh và tâm cụm dễ quy đổi về đơn vị thực tế.
+- Thuật toán hoạt động với khoảng cách Euclidean trên 3 đặc trưng đã chuẩn hóa bằng `StandardScaler` trên tập Train.
+- Nhóm quét dải số cụm `K` từ `2` đến `10` (trong giới hạn hợp lệ theo số mẫu phân biệt) với khởi tạo `k-means++`, `n_init = 10`, `max_iter = 300`, cố định `random_state = 42`.
+- Từ đường Elbow và bảng Silhouette (kèm Davies-Bouldin, Calinski-Harabasz, độ cân bằng cụm), nhóm chọn số cụm `K` phù hợp rồi thử thêm các tổ hợp siêu tham số (`init` giữa `k-means++` và `random`, `n_init` giữa `10` và `20`, `max_iter` giữa `100` và `300`) trước khi fit mô hình baseline cuối với `n_init = 20`.
+- Sau khi huấn luyện trên Train, nhóm gán nhãn thử lên tập Holdout Test bằng tâm cụm đã học để kiểm tra độ ổn định của cấu trúc phân cụm (không dùng chỉ số trên Test để kết luận overfitting như bài học có giám sát).
+- Nhóm lưu ý các hạn chế vốn có của K-Means: nhạy cảm với ngoại lai và giả định cụm dạng cầu đồng đều.
 
 ### 6.6. Phương án đối chiếu tùy chọn
 
-- Nếu thời gian cho phép, nhóm cân nhắc Hierarchical Clustering để tìm hiểu thêm.
-- Nhóm dự kiến dùng Agglomerative với Ward linkage và khoảng cách Euclidean.
-- Nhóm khảo sát số cụm trên cùng dữ liệu và thang đo với baseline.
-- Nhóm dùng Dendrogram để quan sát quá trình gộp cụm khi thực hiện phương án này.
-- Phương pháp phân cấp giúp quan sát nhiều mức phân nhóm nhưng có thể tốn bộ nhớ hơn.
-- Nhóm không mở rộng đồng thời nhiều thuật toán khi chưa giải thích được baseline.
+- Sau khi nắm rõ kết quả baseline K-Means trên tập Train, nhóm dự kiến đối chiếu thêm ba phương án thuộc các họ tiếp cận khác nhau trong giới hạn bài lab:
+  1. **Hierarchical Clustering (Agglomerative):** dùng `Ward` linkage (khoảng cách Euclidean) làm nhánh chính để dựng cây phân cấp, tính ngưỡng cắt Dendrogram theo số cụm K, đồng thời đối chiếu thêm `Complete` và `Average` linkage qua hệ số tương quan `Cophenetic` và độ cân bằng cụm để quan sát hiện tượng kéo chuỗi (*chaining*).
+  2. **DBSCAN (theo mật độ):** vẽ đồ thị `k-distance` (với `k = 4`) để ước lượng bán kính lân cận `eps`, thử lưới cặp `(eps, min_samples)` nhằm quan sát cách tách cụm mật độ cao và phát hiện điểm nhiễu (nhãn `-1`).
+  3. **K-Medoids (chọn điểm thật làm tâm):** cài đặt thuật toán dùng pha khởi tạo BUILD tất định kết hợp bước cập nhật tâm nội cụm, đối chiếu thước đo khoảng cách Euclidean với Manhattan để kiểm tra mức độ ít nhạy cảm với ngoại lai hơn so với tâm trung bình của K-Means.
+- Tất cả phương án đối chiếu đều dùng chung dữ liệu Train và cùng ma trận chuẩn hóa với K-Means để so sánh công bằng trên một bảng tổng hợp.
 
 ### 6.7. Trực quan hóa và diễn giải dự kiến
 
-- Nhóm thiết kế Scatter Plot với màu biểu thị nhãn cụm.
-- Trục biểu đồ cần thể hiện rõ tên thuộc tính và đơn vị sử dụng.
-- Nhóm dự kiến quan sát các cặp tuổi, thu nhập và điểm chi tiêu.
-- Nhóm dùng thống kê trung bình, median và quy mô cụm để hỗ trợ diễn giải.
-- Nhóm mô tả cụm theo đặc điểm dữ liệu thay vì gán sẵn tên phân khúc.
-- Nhãn cụm chỉ có vai trò định danh, không thể hiện thứ hạng khách hàng.
-- Nhóm thận trọng khi các điểm chồng lấp trong hình chiếu hai chiều.
+- Nhóm dự kiến xuất các nhóm biểu đồ phục vụ báo cáo theo từng giai đoạn: phân phối EDA & ma trận tương quan, đối chiếu 3 phương pháp chuẩn hóa, đường Elbow & Silhouette cho K-Means, Dendrogram cho Hierarchical, đồ thị `k-distance` cho DBSCAN, cùng các biểu đồ cụm 2D (`Income` - `Total_Spending`), 3D (`Age` - `Income` - `Total_Spending`) và Silhouette chi tiết từng cụm.
+- Nhãn trục biểu đồ ghi rõ tên đặc trưng và đơn vị gốc khi trực quan hóa trên không gian chưa chuẩn hóa.
+- Để diễn giải cụm, nhóm lập bảng hồ sơ thống kê theo đơn vị gốc (quy mô, tỷ lệ %, tuổi trung bình/trung vị, thu nhập trung bình/trung vị, chi tiêu trung bình/trung vị, học vấn và hôn nhân phổ biến, nhóm sản phẩm `Mnt*` chi nhiều nhất).
+- Nhóm xây dựng cách đặt tên chân dung khách hàng (persona) linh hoạt từ dữ liệu thống kê của từng cụm cho số cụm `K` bất kỳ, coi nhãn cụm chỉ là mã định danh chứ không gán thứ bậc hay suy diễn cảm tính.
 
 ### 6.8. Giới hạn cần tính đến
 
-- Tập dữ liệu học tập có thể không đại diện cho toàn bộ khách hàng bán lẻ.
-- Ba thuộc tính số chỉ phản ánh một phần đặc điểm và hành vi khách hàng.
-- Việc chọn đặc trưng và scaling có thể làm thay đổi cấu trúc phân cụm.
-- Nhóm dự kiến phân tích toàn bộ tập dữ liệu cho mục tiêu khám phá của bài lab.
-- Thiết kế này không dùng việc phân cụm để khẳng định khả năng tổng quát hóa.
-- Nhóm sẽ mô tả rõ những giả định chưa thể kiểm chứng trong phạm vi thực hành.
+- Tập dữ liệu chỉ phản ánh một tập khách hàng mẫu trong giai đoạn thu thập gắn với chiến dịch tiếp thị cũ, không đại diện cho toàn bộ thị trường bán lẻ.
+- Ba thuộc tính `Age`, `Income`, `Total_Spending` chỉ phản ánh một phần hành vi mua sắm và bỏ qua tần suất giao dịch hay kênh mua hàng khi tính khoảng cách.
+- Kết quả phân cụm phụ thuộc vào phép chọn đặc trưng, cách chuẩn hóa và giả định hình dạng cụm của từng thuật toán.
+- Cách chia `80/20` chỉ giúp tránh rò rỉ dữ liệu khi chuẩn hóa/điền khuyết và quan sát độ ổn định phân bố trên dữ liệu mới cho K-Means và K-Medoids (còn Hierarchical và DBSCAN không suy diễn trực tiếp cho điểm mới theo cùng cơ chế), chứ không thay thế cho việc kiểm định bằng nhãn thực tế.
+- Các phần mở rộng như lưu gói mô hình hay thử dự đoán mẫu chỉ nhằm minh họa quy trình trọn vẹn trong bài lab, không hướng tới vận hành thực tế.
 
 ## 7. TARGET STRUCTURE - Cấu trúc thư mục bài lab dự kiến
 

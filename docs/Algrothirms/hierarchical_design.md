@@ -2,83 +2,68 @@
 
 ## 1. Purpose - Mục đích
 
-- Nhóm dự kiến dùng Agglomerative Clustering làm phương án đối chiếu tùy chọn sau baseline K-Means.
-- Nhóm tìm hiểu cách hình thành các cụm bằng quá trình gộp từ từng khách hàng.
-- Nhóm dùng Dendrogram để quan sát cấu trúc phân cấp và các mức phân nhóm.
-- Phạm vi tuân theo mục 6.6 của [thiết kế chung](design.md), phù hợp một bài lab học tập.
+- Nhóm dùng Agglomerative Clustering làm nhánh đối chiếu quan trọng ngay sau baseline K-Means.
+- Nhóm tìm hiểu cách hình thành các cụm theo cấu trúc phân cấp từ dưới lên (gộp dần từ từng khách hàng).
+- Nhóm dùng Dendrogram cùng hệ số tương quan Cophenetic để quan sát mức độ bảo toàn khoảng cách và chọn ngưỡng cắt cụm.
+- Phạm vi tuân theo mục 6.6 của [thiết kế chung](design.md), phù hợp bài lab học tập.
 
 ## 2. Data used - Dữ liệu sử dụng
 
-- Nguồn raw nội bộ được nêu trong thiết kế chung là `data/raw/marketing_campaign.csv`.
-- Dữ liệu này có `Year_Birth`, `Income` và các khoản chi tiêu, nhưng thiếu `Gender` và `Spending Score` theo đề.
-- Nhóm cần thống nhất nguồn dữ liệu hoặc cách xác định đặc trưng trước khi thực hành phân cụm.
-- Nhóm không tự xem `Year_Birth` là tuổi hoặc tổng chi tiêu là `Spending Score`.
-- Nếu xây dựng tuổi từ năm sinh, nhóm cần thống nhất năm tham chiếu và ý nghĩa của phép biến đổi.
-- Thiết kế dự kiến dùng tuổi, thu nhập hằng năm và điểm chi tiêu khi các thuộc tính được xác nhận phù hợp.
-- Nhóm sử dụng đúng tập khách hàng, thứ tự bản ghi, đặc trưng và phép scaling của [baseline K-Means](kmeans_design.md).
-- Nhóm giữ dữ liệu theo đơn vị gốc và mã khách hàng để hỗ trợ đối chiếu, diễn giải.
+- Nguồn raw nội bộ là `data/raw/marketing_campaign.csv`, đã được làm sạch lỗi miền, tách `Train (80%)` / `Holdout Test (20%)` và điền khuyết `Income` bằng trung vị của tập Train.
+- Nhóm dùng đúng 3 đặc trưng số đã thống nhất (`Age = 2014 - Year_Birth`, `Income`, `Total_Spending`), cùng tập mẫu `Train (80%)`, thứ tự dòng và bộ chuẩn hóa `StandardScaler` với [baseline K-Means](kmeans_design.md).
+- Cột `Gender` không có trong tập dữ liệu nên nhóm không tự tạo; mã `ID` tách riêng khỏi phép tính khoảng cách, còn `Education`, `Marital_Status` và 6 cột `Mnt*` giữ ở bảng gốc để diễn giải cụm.
 
 ## 3. Input - Đầu vào
 
-| Thành phần | Yêu cầu dự kiến |
+| Thành phần | Yêu cầu thiết kế |
 |---|---|
-| Ma trận đặc trưng | Dữ liệu số gồm n khách hàng và các thuộc tính đã thống nhất |
-| Dữ liệu chuẩn hóa | Dùng phương án trong [thiết kế Feature Scaling](feature_scaling_design.md) |
-| Chất lượng dữ liệu | Không còn giá trị thiếu hoặc không hữu hạn trong ma trận phân cụm |
-| Số cụm K | Giá trị thuộc phạm vi khảo sát hợp lệ |
-| Quy tắc gộp | Ward linkage với khoảng cách Euclidean |
-| Thông tin đối chiếu | Mã khách hàng và dữ liệu gốc tách khỏi ma trận khoảng cách |
+| Ma trận đặc trưng | Ma trận `Train (80%)` chuẩn hóa gồm `n` khách hàng và `3` đặc trưng số |
+| Dữ liệu chuẩn hóa | Dùng `StandardScaler` fit trên Train theo [thiết kế Feature Scaling](feature_scaling_design.md) |
+| Chất lượng dữ liệu | Không còn giá trị thiếu (`NaN`) hoặc không hữu hạn (`Inf`) |
+| Số cụm `K` | Khảo sát trong dải `2` đến `10` (thỏa điều kiện hợp lệ theo số mẫu) |
+| Quy tắc gộp | `Ward` linkage (Euclidean) làm chính; đối chiếu thêm `Complete` và `Average` |
+| Thông tin đối chiếu | Mã `ID` và các cột theo đơn vị gốc giữ riêng để giải thích cụm |
 
 ## 4. Output - Đầu ra dự kiến
 
-- Nhãn cụm cho từng khách hàng, giữ liên kết với đúng bản ghi đầu vào.
-- Thông tin quá trình gộp để phục vụ Dendrogram nếu nhóm thực hiện trực quan hóa phân cấp.
-- Bảng mô tả cấu hình, số cụm thực tế, quy mô từng cụm và chỉ số đánh giá hợp lệ.
-- Scatter Plot theo các cặp thuộc tính để hỗ trợ quan sát cách phân nhóm.
-- Thống kê theo đơn vị gốc để nhóm diễn giải đặc điểm từng cụm.
-- Nhãn cụm chỉ là định danh; nhóm không gán ý nghĩa thứ hạng hay tên phân khúc trước.
+- Nhãn cụm cho từng khách hàng trên tập Train, khớp đúng thứ tự bản ghi đầu vào.
+- Ma trận liên kết phân cấp (`linkage matrix`), hệ số tương quan **Cophenetic** cho các kiểu gộp (`Ward`, `Complete`, `Average`) và ngưỡng cắt tương ứng với `K` đã chọn để vẽ đường cắt trên Dendrogram.
+- Bảng quét `K = 2..10` gồm các chỉ số `Silhouette`, `Davies-Bouldin`, `Calinski-Harabasz`.
+- Bảng đối chiếu giữa phương pháp phân cấp và K-Means cùng trên một tập dữ liệu Train, kèm thống kê theo đơn vị gốc.
+- Nhãn cụm chỉ mang tính định danh, không suy diễn thứ hạng trước khi phân tích dữ liệu cụm.
 
 ## 5. Cách thực hiện dự kiến
 
-1. Nhóm kiểm tra điều kiện dữ liệu và dùng lại ma trận chuẩn hóa đã thống nhất với baseline.
-2. Ban đầu, mỗi khách hàng được xem là một cụm riêng.
-3. Ở mỗi bước, Ward chọn cặp cụm có mức tăng tổng bình phương sai lệch trong cụm nhỏ nhất để gộp.
-4. Nhóm xét các mức cắt cây tương ứng với số cụm K trong phạm vi dự kiến.
-5. Nhóm đánh giá từng cấu hình trên cùng không gian đặc trưng dùng cho K-Means.
-6. Nhóm đối chiếu chỉ số, quy mô cụm và khả năng diễn giải để cân nhắc phương án phù hợp.
+1. Kiểm tra ma trận chuẩn hóa `Train (80%)` hữu hạn và dùng lại đúng dữ liệu đầu vào của K-Means baseline.
+2. Tính ma trận liên kết và hệ số tương quan `Cophenetic` cho `Ward` (chính) cùng `Complete` và `Average`, đồng thời thử tách `K = 2` tham chiếu để quan sát độ cân bằng kích thước cụm và hiện tượng kéo chuỗi (*chaining*).
+3. Với phương pháp chính `Ward`, quét dải `K = 2..10` để ghi nhận `Silhouette`, `Davies-Bouldin`, `Calinski-Harabasz` và chọn `K` có chất lượng tách cụm tốt nhất.
+4. Huấn luyện mô hình Agglomerative `Ward` tại `K` đã chọn và tính ngưỡng cắt tương ứng trên ma trận liên kết để vẽ Dendrogram.
+5. Đưa nhãn cụm `Ward` vào bảng đối chiếu chung với K-Means, DBSCAN và K-Medoids trên cùng tập Train.
 
 ## 6. Tham số và điều kiện khảo sát
 
-- Phương pháp dự kiến: Agglomerative; linkage: Ward; khoảng cách: Euclidean.
-- Nhóm khảo sát K từ 2 đến 10, giới hạn theo số khách hàng và số điểm đặc trưng phân biệt.
-- Khi tính Silhouette, nhóm cần K thực tế nhỏ hơn số khách hàng được đánh giá.
-- Nhóm giữ nguyên dữ liệu và scaling giữa hai thuật toán để việc đối chiếu có ý nghĩa.
-- Nhóm không mở rộng nhiều kiểu linkage trong phạm vi thực hành ban đầu.
-- Nhóm chỉ thực hiện phần tùy chọn khi có đủ thời gian sau baseline.
+- Phương pháp chính: `AgglomerativeClustering` với `linkage = "ward"` và khoảng cách `euclidean` (lưu ý `ward` bắt buộc dùng Euclidean).
+- Phương pháp đối chiếu linkage: thử thêm `complete` và `average` (module vẫn có thể hỗ trợ kiểm tra `single` nếu cần khảo sát trường hợp cực đoan), đo `Cophenetic correlation` và tỷ lệ cân bằng cụm tại `K = 2`.
+- Dải khảo sát số cụm: `K` từ `2` đến `10` (trong giới hạn `2 <= K < n_samples`).
+- Giữ nguyên tập dữ liệu Train và ma trận `StandardScaler` giữa Hierarchical và K-Means để việc so sánh có ý nghĩa.
 
 ## 7. Evaluation metrics - Tiêu chí đánh giá
 
-- Silhouette coefficient là chỉ số chính, thống nhất với mục 6.4 của thiết kế chung.
-- Nhóm tính Silhouette khi số nhãn cụm thực tế nằm từ 2 đến n - 1.
-- Nếu điều kiện không thỏa mãn, nhóm ghi không tính được kèm lý do, không thay bằng điểm giả.
-- Nhóm ưu tiên Silhouette cao hơn nhưng vẫn xem xét quy mô cụm và ý nghĩa đặc trưng.
-- Nhóm không xem Inertia của K-Means là chỉ số sẵn có để đối chiếu trực tiếp hai thuật toán.
-- Dendrogram giúp quan sát mức gộp; độ cao nhánh biểu thị mức gộp theo Ward, không phải điểm Silhouette.
-- Nhóm kết hợp Scatter Plot và thống kê cụm; hình chiếu hai chiều chỉ hỗ trợ quan sát.
-- Nhóm không dùng Accuracy hoặc cam kết một ngưỡng chất lượng khi chưa có cơ sở dữ liệu phù hợp.
+- `Silhouette coefficient` trên ma trận chuẩn hóa Train là chỉ số chính, áp dụng khi số cụm nằm từ `2` đến `n - 1` (không gán giá trị `0` giả nếu không thỏa điều kiện).
+- Kết hợp thêm `Davies-Bouldin`, `Calinski-Harabasz`, `Dunn Index`, tỷ lệ Silhouette âm (%) và độ cân bằng kích thước cụm khi đối chiếu toàn bảng mô hình.
+- Hệ số tương quan **Cophenetic** dùng để đo mức độ cây phân cấp bảo toàn khoảng cách đôi ban đầu giữa các điểm ở từng kiểu `linkage`.
+- Không dùng `Inertia` của K-Means làm thước đo cho Hierarchical.
+- Độ cao nhánh trên Dendrogram phản ánh khoảng cách/mức tăng phương sai khi gộp theo `Ward`, không phải điểm Silhouette.
 
 ## 8. Hạn chế và điều kiện sử dụng
 
-- Quá trình phân cấp có thể cần nhiều bộ nhớ và thời gian khi số khách hàng tăng.
-- Ward có thể chịu ảnh hưởng của thang đo và ngoại lai; nhóm cần rà soát tiền xử lý.
-- Quyết định gộp ở bước trước không được đảo ngược trong quá trình Agglomerative.
-- Cây nhiều nhánh có thể khó đọc; nhóm có thể trình bày phần rút gọn và ghi rõ cách rút gọn.
-- Nhóm dùng phương pháp để khám phá tập dữ liệu của bài lab, không suy diễn khả năng vận hành thực tế.
+- Agglomerative đòi hỏi tính khoảng cách cặp và lưu ma trận liên kết nên tốn bộ nhớ và thời gian hơn K-Means khi số lượng khách hàng tăng lớn.
+- Khác với K-Means hay K-Medoids có tâm cụm để gán nhãn trực tiếp lên `Holdout Test (20%)`, Hierarchical thuộc nhóm thuật toán phân cụm trên tập mẫu hiện có (không có bước suy đoán độc lập lên điểm mới nếu không gán lại theo láng giềng gần nhất hoặc gom lại).
+- Quyết định gộp ở bước trước không thể đảo ngược ở các bước sau; riêng `Complete` hoặc `Average` (hay `Single`) dễ gặp tình trạng gom lệch một cụm rất nhỏ và một cụm rất lớn (*chaining effect*) khi dữ liệu có ngoại lai.
+- Cây nhiều nhánh khó quan sát hết chi tiết lá, nên cần cắt nhánh hiển thị hợp lý kèm đường ngưỡng cắt khi vẽ Dendrogram.
 
 ## 9. Status - Trạng thái thiết kế
 
-- **Dự kiến, tùy chọn:** tài liệu mô tả hướng thực hành sau baseline K-Means.
-- **Điều kiện dữ liệu cần thống nhất:** nguồn raw và bộ thuộc tính phải phù hợp với mục tiêu trong thiết kế chung.
-- **Điều kiện bắt đầu:** nhóm xác nhận đặc trưng, cách scaling và tiêu chí đánh giá trước khi phân cụm.
-- **Điều kiện rà soát:** nhóm kiểm tra đủ liên kết bản ghi, tham số, chỉ số hợp lệ và cách diễn giải dự kiến.
-- Nhóm sẽ ghi nhận thay đổi lựa chọn tại thiết kế chung để các tài liệu thuật toán luôn thống nhất.
+- **Đã thống nhất trong phạm vi bài lab:** dùng `Ward` (Euclidean) làm nhánh đối chiếu chính bên cạnh baseline K-Means, có đối chiếu `Complete` và `Average` bằng `Cophenetic`.
+- **Điều kiện dữ liệu:** sử dụng chung bộ 3 đặc trưng số trên tập `Train (80%)` và chuẩn hóa `StandardScaler`.
+- Tài liệu mô tả thiết kế phương pháp trước thực nghiệm, không báo cáo tiến độ mã nguồn hay số liệu kết quả chạy.
