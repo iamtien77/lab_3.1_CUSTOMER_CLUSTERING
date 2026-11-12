@@ -32,6 +32,14 @@ results/metrics/*
 !results/metrics/.gitkeep
 results/saved_models/*
 !results/saved_models/.gitkeep
+notebooks/results/processed/*
+!notebooks/results/processed/.gitkeep
+notebooks/results/figures/*
+!notebooks/results/figures/.gitkeep
+notebooks/results/metrics/*
+!notebooks/results/metrics/.gitkeep
+notebooks/results/saved_models/*
+!notebooks/results/saved_models/.gitkeep
 docs/*
 !docs/Practice Exercise 3.pdf
 !docs/description_working_with_AI/

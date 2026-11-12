@@ -45,6 +45,13 @@ DOCS_DIR = PROJECT_ROOT / "docs"
 NOTEBOOKS_DIR = PROJECT_ROOT / "notebooks"
 TESTS_DIR = PROJECT_ROOT / "tests"
 
+# Thư mục lưu đầu ra tách biệt dành riêng cho Jupyter Notebooks (không ghi đè kết quả của main.py)
+NOTEBOOK_RESULTS_DIR = NOTEBOOKS_DIR / "results"
+NOTEBOOK_PROCESSED_DIR = NOTEBOOK_RESULTS_DIR / "processed"
+NOTEBOOK_FIGURES_DIR = NOTEBOOK_RESULTS_DIR / "figures"
+NOTEBOOK_METRICS_DIR = NOTEBOOK_RESULTS_DIR / "metrics"
+NOTEBOOK_SAVED_MODELS_DIR = NOTEBOOK_RESULTS_DIR / "saved_models"
+
 # Tự động khởi tạo cấu trúc thư mục nếu chưa tồn tại trên ổ đĩa
 for directory in [
     RAW_DATA_DIR,
