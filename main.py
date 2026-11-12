@@ -90,8 +90,8 @@ def step_0_data_ingestion() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         raise ValueError(f"Schema dữ liệu không hợp lệ: {schema_info}")
 
     # Kiểm toán bản ghi gốc trước khi lọc để ghi nhận đầy đủ giá trị thiếu/ngoại lai ban đầu
-    audit_goc = audit_missing_and_outliers(raw_df)
-    audit_goc.to_csv(METRICS_DIR / "raw_data_audit.csv", index=False)
+    raw_audit_df = audit_missing_and_outliers(raw_df)
+    raw_audit_df.to_csv(METRICS_DIR / "raw_data_audit.csv", index=False)
 
     # Lọc các lỗi nhập liệu cực đoan (Year_Birth < 1920, Income > 200,000) và tạo đặc trưng từng dòng
     valid_df = filter_invalid_records(raw_df)
@@ -125,45 +125,45 @@ def step_1_data_exploration(
     """
     print_section("BƯỚC 1: KHÁM PHÁ DỮ LIỆU (EDA & PHÁT HIỆN NGOẠI LAI)")
     if raw_df is not None:
-        so_null_income = int(raw_df[INCOME_COLUMN].isnull().sum()) if INCOME_COLUMN in raw_df.columns else 0
-        so_nam_sinh_loi = (
+        income_null_count = int(raw_df[INCOME_COLUMN].isnull().sum()) if INCOME_COLUMN in raw_df.columns else 0
+        invalid_birth_count = (
             int((pd.to_numeric(raw_df[YEAR_BIRTH_COLUMN], errors="coerce") < MIN_VALID_YEAR_BIRTH).sum())
             if YEAR_BIRTH_COLUMN in raw_df.columns
             else 0
         )
-        so_thu_nhap_loi = (
+        invalid_income_count = (
             int((pd.to_numeric(raw_df[INCOME_COLUMN], errors="coerce") > MAX_VALID_INCOME).sum())
             if INCOME_COLUMN in raw_df.columns
             else 0
         )
-        gia_tri_tinh_trang_la: Dict[str, int] = {}
+        unusual_marital_counts: Dict[str, int] = {}
         if "Marital_Status" in raw_df.columns:
-            dem_hon_nhan = raw_df["Marital_Status"].value_counts()
-            for nhan_la in ("Alone", "Absurd", "YOLO"):
-                if nhan_la in dem_hon_nhan:
-                    gia_tri_tinh_trang_la[nhan_la] = int(dem_hon_nhan[nhan_la])
+            marital_counts = raw_df["Marital_Status"].value_counts()
+            for unusual_label in ("Alone", "Absurd", "YOLO"):
+                if unusual_label in marital_counts:
+                    unusual_marital_counts[unusual_label] = int(marital_counts[unusual_label])
         print(" [KIỂM TOÁN DỮ LIỆU THÔ TRƯỚC LÀM SẠCH]")
         print(
-            f"  - Tổng bản ghi thô: {len(raw_df):,} | Thiếu {INCOME_COLUMN}: {so_null_income} | "
-            f"{YEAR_BIRTH_COLUMN} < {MIN_VALID_YEAR_BIRTH}: {so_nam_sinh_loi} | "
-            f"{INCOME_COLUMN} > {MAX_VALID_INCOME:,}: {so_thu_nhap_loi}"
+            f"  - Tổng bản ghi thô: {len(raw_df):,} | Thiếu {INCOME_COLUMN}: {income_null_count} | "
+            f"{YEAR_BIRTH_COLUMN} < {MIN_VALID_YEAR_BIRTH}: {invalid_birth_count} | "
+            f"{INCOME_COLUMN} > {MAX_VALID_INCOME:,}: {invalid_income_count}"
         )
-        if gia_tri_tinh_trang_la:
-            print(f"  - Nhãn Marital_Status bất thường (giữ lại làm biến mô tả): {gia_tri_tinh_trang_la}")
+        if unusual_marital_counts:
+            print(f"  - Nhãn Marital_Status bất thường (giữ lại làm biến mô tả): {unusual_marital_counts}")
         if "Dt_Customer" in raw_df.columns:
-            dt_nam = pd.to_datetime(raw_df["Dt_Customer"], format="%d-%m-%Y", errors="coerce").dt.year.dropna()
-            if not dt_nam.empty:
+            enrollment_years = pd.to_datetime(raw_df["Dt_Customer"], format="%d-%m-%Y", errors="coerce").dt.year.dropna()
+            if not enrollment_years.empty:
                 print(
-                    f"  - Thời gian gia nhập Dt_Customer: {int(dt_nam.min())}–{int(dt_nam.max())} "
+                    f"  - Thời gian gia nhập Dt_Customer: {int(enrollment_years.min())}–{int(enrollment_years.max())} "
                     f"(phù hợp mốc quy đổi Tuổi REFERENCE_YEAR={REFERENCE_YEAR})"
                 )
 
-    so_trung_3d = int(train_df[NUMERICAL_FEATURES].duplicated().sum())
-    print(f"  - Số bản ghi trùng hoàn toàn trên 3 đặc trưng số ở tập Train: {so_trung_3d}")
+    duplicate_3d_count = int(train_df[NUMERICAL_FEATURES].duplicated().sum())
+    print(f"  - Số bản ghi trùng hoàn toàn trên 3 đặc trưng số ở tập Train: {duplicate_3d_count}")
 
-    thong_ke = train_df[NUMERICAL_FEATURES].agg(["count", "mean", "median", "std", "min", "max", "skew"]).T
+    summary_stats = train_df[NUMERICAL_FEATURES].agg(["count", "mean", "median", "std", "min", "max", "skew"]).T
     print("\n [THỐNG KÊ MÔ TẢ TẬP TRAIN]")
-    print(thong_ke.round(2).to_string())
+    print(summary_stats.round(2).to_string())
 
     audit_train = audit_missing_and_outliers(train_df)
     audit_train.to_csv(METRICS_DIR / "train_iqr_audit.csv", index=False)
@@ -185,45 +185,45 @@ def step_2_feature_scaling(
     kiểm chứng hậu điều kiện Train/Test và fit StandardScaler chỉ trên Train.
     """
     print_section("BƯỚC 2: CHUẨN HÓA ĐẶC TRƯNG (FEATURE SCALING)")
-    bang_scaler = compare_scalers(train_df)
-    bang_scaler.to_csv(METRICS_DIR / "scaler_comparison.csv", index=False)
+    scaler_comparison_df = compare_scalers(train_df)
+    scaler_comparison_df.to_csv(METRICS_DIR / "scaler_comparison.csv", index=False)
     print("\n [SO SÁNH THANG ĐO GỐC VS STANDARD / MINMAX / ROBUST]")
-    print(bang_scaler.to_string(index=False))
+    print(scaler_comparison_df.to_string(index=False))
 
-    bang_anh_huong = evaluate_scalers_on_clustering(train_df, test_df=test_df)
-    bang_anh_huong.to_csv(METRICS_DIR / "scaler_clustering_comparison.csv", index=False)
+    scaler_clustering_df = evaluate_scalers_on_clustering(train_df, test_df=test_df)
+    scaler_clustering_df.to_csv(METRICS_DIR / "scaler_clustering_comparison.csv", index=False)
     print("\n [ĐỐI CHIẾU TÁC ĐỘNG CỦA SCALER LÊN K-MEANS (CỐ ĐỊNH DỮ LIỆU & ĐẶC TRƯNG)]")
-    print(bang_anh_huong.to_string(index=False))
+    print(scaler_clustering_df.to_string(index=False))
 
     scaler = FeatureScaler(method="standard")
-    ma_tran_train = scaler.fit_transform(train_df)
-    ma_tran_test = scaler.transform(test_df)
+    train_matrix = scaler.fit_transform(train_df)
+    test_matrix = scaler.transform(test_df)
 
-    bang_tham_so = scaler.get_learned_params()
-    bang_tham_so.to_csv(METRICS_DIR / "scaler_params.csv", index=False)
+    scaler_params_df = scaler.get_learned_params()
+    scaler_params_df.to_csv(METRICS_DIR / "scaler_params.csv", index=False)
     print("\n [THAM SỐ STANDARDSCALER ĐÃ HỌC CHỈ TRÊN TẬP TRAIN]")
-    print(bang_tham_so.to_string(index=False))
+    print(scaler_params_df.to_string(index=False))
 
     # Kiểm chứng hậu điều kiện trên Train/Test và đối chiếu độ nhạy biên [0, 1] với MinMaxScaler
-    minmax_doi_chieu = FeatureScaler(method="minmax").fit(train_df)
-    bang_hau_kiem = pd.concat(
+    minmax_reference_scaler = FeatureScaler(method="minmax").fit(train_df)
+    verification_df = pd.concat(
         [
-            scaler.verify_scaled_matrix(ma_tran_train, is_train=True),
-            scaler.verify_scaled_matrix(ma_tran_test, is_train=False),
-            minmax_doi_chieu.verify_scaled_matrix(minmax_doi_chieu.transform(test_df), is_train=False),
+            scaler.verify_scaled_matrix(train_matrix, is_train=True),
+            scaler.verify_scaled_matrix(test_matrix, is_train=False),
+            minmax_reference_scaler.verify_scaled_matrix(minmax_reference_scaler.transform(test_df), is_train=False),
         ],
         ignore_index=True,
     )
-    bang_hau_kiem.to_csv(METRICS_DIR / "scaler_verification.csv", index=False)
+    verification_df.to_csv(METRICS_DIR / "scaler_verification.csv", index=False)
     print("\n [HẬU KIỂM MA TRẬN CHUẨN HÓA TRÊN TRAIN & HOLDOUT TEST]")
-    print(bang_hau_kiem.to_string(index=False))
+    print(verification_df.to_string(index=False))
 
-    plot_scaling_comparison(train_df, ma_tran_train)
+    plot_scaling_comparison(train_df, train_matrix)
     logger.info("Hoàn tất Bước 2: Đã chuẩn hóa tập Train và Test không rò rỉ dữ liệu.")
-    return scaler, ma_tran_train, ma_tran_test
+    return scaler, train_matrix, test_matrix
 
 
-def step_3_clustering_experiments(ma_tran_train: Any) -> Dict[str, Any]:
+def step_3_clustering_experiments(train_matrix: Any) -> Dict[str, Any]:
     """
     Bước 3: Huấn luyện K-Means Baseline, đồng thời đối chứng Hierarchical, DBSCAN và K-Medoids.
     """
@@ -231,7 +231,7 @@ def step_3_clustering_experiments(ma_tran_train: Any) -> Dict[str, Any]:
 
     # 1. Baseline chính: K-Means (khởi tạo k-means++, quét K=2..10)
     kmeans_trainer = KMeansTrainer(random_state=RANDOM_SEED)
-    k_search_df = kmeans_trainer.search_optimal_k(ma_tran_train, K_SEARCH_RANGE)
+    k_search_df = kmeans_trainer.search_optimal_k(train_matrix, K_SEARCH_RANGE)
     k_search_df.to_csv(METRICS_DIR / "kmeans_k_search.csv", index=False)
     print("\n [KẾT QUẢ QUÉT K-MEANS TỪ K=2 ĐẾN K=10]")
     print(k_search_df.to_string(index=False))
@@ -239,103 +239,103 @@ def step_3_clustering_experiments(ma_tran_train: Any) -> Dict[str, Any]:
     optimal_k = int(k_search_df.loc[k_search_df["Silhouette"].idxmax(), "K"])
     plot_elbow_and_silhouette(k_search_df, optimal_k=optimal_k)
 
-    hyperparam_df = kmeans_trainer.experiment_hyperparameters(ma_tran_train, n_clusters=optimal_k)
+    hyperparam_df = kmeans_trainer.experiment_hyperparameters(train_matrix, n_clusters=optimal_k)
     hyperparam_df.to_csv(METRICS_DIR / "kmeans_hyperparams.csv", index=False)
-    kmeans_model = kmeans_trainer.fit_final_model(ma_tran_train, optimal_k=optimal_k, init="k-means++", n_init=20)
+    kmeans_model = kmeans_trainer.fit_final_model(train_matrix, optimal_k=optimal_k, init="k-means++", n_init=20)
 
     # 2. Hierarchical Clustering (đối chiếu linkage Ward/Complete/Average, ghi nhận hiệu ứng chaining)
-    lien_ket_coph = []
+    cophenetic_rows = []
     trainer_ward = None
-    for phuong_phap in ("ward", "complete", "average"):
-        trainer_tam = HierarchicalTrainer(linkage_method=phuong_phap)
-        trainer_tam.compute_linkage_matrix(ma_tran_train)
-        mo_hinh_k2 = trainer_tam.fit_model(ma_tran_train, n_clusters=2)
-        nhan_k2 = mo_hinh_k2.labels_
-        chi_so_k2 = evaluate_clustering(
-            ma_tran_train,
-            nhan_k2,
-            model_name=f"Hier_{phuong_phap}_K2",
+    for method_name in ("ward", "complete", "average"):
+        temp_trainer = HierarchicalTrainer(linkage_method=method_name)
+        temp_trainer.compute_linkage_matrix(train_matrix)
+        k2_model = temp_trainer.fit_model(train_matrix, n_clusters=2)
+        k2_labels = k2_model.labels_
+        k2_metrics = evaluate_clustering(
+            train_matrix,
+            k2_labels,
+            model_name=f"Hier_{method_name}_K2",
             compute_dunn=False,
         )
-        dem_cum_k2 = pd.Series(nhan_k2).value_counts().sort_index().to_dict()
-        lien_ket_coph.append(
+        k2_cluster_counts = pd.Series(k2_labels).value_counts().sort_index().to_dict()
+        cophenetic_rows.append(
             {
-                "Linkage": phuong_phap,
-                "Cophenetic_Correlation": round(trainer_tam.cophenetic_corr_, 4),
-                "K2_Silhouette": chi_so_k2["silhouette"],
-                "K2_Balance_Ratio": chi_so_k2["cluster_balance_ratio"],
-                "K2_Cluster_Sizes": str(dem_cum_k2),
+                "Linkage": method_name,
+                "Cophenetic_Correlation": round(temp_trainer.cophenetic_corr_, 4),
+                "K2_Silhouette": k2_metrics["silhouette"],
+                "K2_Balance_Ratio": k2_metrics["cluster_balance_ratio"],
+                "K2_Cluster_Sizes": str(k2_cluster_counts),
             }
         )
-        if phuong_phap == "ward":
-            trainer_ward = trainer_tam
-    bang_lien_ket = pd.DataFrame(lien_ket_coph)
-    bang_lien_ket.to_csv(METRICS_DIR / "hierarchical_cophenetic.csv", index=False)
+        if method_name == "ward":
+            trainer_ward = temp_trainer
+    cophenetic_df = pd.DataFrame(cophenetic_rows)
+    cophenetic_df.to_csv(METRICS_DIR / "hierarchical_cophenetic.csv", index=False)
     print("\n [ĐỐI CHIẾU PHƯƠNG PHÁP LINKAGE HIERARCHICAL (TẠI K=2)]")
-    print(bang_lien_ket.to_string(index=False))
+    print(cophenetic_df.to_string(index=False))
 
     if trainer_ward is None:
         trainer_ward = HierarchicalTrainer(linkage_method="ward")
-        trainer_ward.compute_linkage_matrix(ma_tran_train)
-    hier_search_df = trainer_ward.search_optimal_k(ma_tran_train, K_SEARCH_RANGE)
+        trainer_ward.compute_linkage_matrix(train_matrix)
+    hier_search_df = trainer_ward.search_optimal_k(train_matrix, K_SEARCH_RANGE)
     hier_search_df.to_csv(METRICS_DIR / "hierarchical_k_search.csv", index=False)
     hier_optimal_k = int(hier_search_df.loc[hier_search_df["Silhouette"].idxmax(), "K"])
 
-    hier_model = trainer_ward.fit_model(ma_tran_train, n_clusters=hier_optimal_k)
-    nguong_cat = trainer_ward.compute_cut_threshold(hier_optimal_k)
-    plot_dendrogram(trainer_ward.linkage_matrix_, cut_threshold=nguong_cat)
+    hier_model = trainer_ward.fit_model(train_matrix, n_clusters=hier_optimal_k)
+    cut_threshold = trainer_ward.compute_cut_threshold(hier_optimal_k)
+    plot_dendrogram(trainer_ward.linkage_matrix_, cut_threshold=cut_threshold)
 
     # 3. DBSCAN (đồ thị k-NN k=4 & lưới tham số eps, min_samples)
     dbscan_trainer = DBSCANTrainer()
-    k_distances = dbscan_trainer.compute_k_distances(ma_tran_train, k=4)
+    k_distances = dbscan_trainer.compute_k_distances(train_matrix, k=4)
     plot_dbscan_k_distance(k_distances, k=4)
 
     dbscan_grid = dbscan_trainer.grid_search_params(
-        ma_tran_train,
+        train_matrix,
         eps_values=[0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
         min_samples_values=[4, 5, 8, 10],
     )
     dbscan_grid.to_csv(METRICS_DIR / "dbscan_grid_search.csv", index=False)
     best_eps, best_ms = dbscan_trainer.best_params_ if dbscan_trainer.best_params_ else (0.5, 5)
-    dbscan_model = dbscan_trainer.fit_model(ma_tran_train, eps=best_eps, min_samples=best_ms)
+    dbscan_model = dbscan_trainer.fit_model(train_matrix, eps=best_eps, min_samples=best_ms)
 
     # 4. K-Medoids (BUILD tất định & cập nhật nội cụm, quét K=2..10 và so sánh thước đo khoảng cách)
     kmedoids_search_df = KMedoidsTrainer(
         n_clusters=optimal_k,
         metric="euclidean",
         random_state=RANDOM_SEED,
-    ).search_optimal_k(ma_tran_train, K_SEARCH_RANGE)
+    ).search_optimal_k(train_matrix, K_SEARCH_RANGE)
     kmedoids_search_df.to_csv(METRICS_DIR / "kmedoids_k_search.csv", index=False)
     kmedoids_optimal_k = int(kmedoids_search_df.loc[kmedoids_search_df["Silhouette"].idxmax(), "K"])
 
-    bang_thuoc_do_kmedoids = []
+    kmedoids_metric_rows = []
     kmedoids_trainer = None
-    for thuoc_do in ("euclidean", "manhattan"):
+    for metric_name in ("euclidean", "manhattan"):
         trainer_km = KMedoidsTrainer(
             n_clusters=kmedoids_optimal_k,
-            metric=thuoc_do,
+            metric=metric_name,
             random_state=RANDOM_SEED,
         )
-        nhan_km = trainer_km.fit_predict(ma_tran_train)
-        chi_so_km = evaluate_clustering(
-            ma_tran_train,
-            nhan_km,
-            model_name=f"K-Medoids ({thuoc_do}, K={kmedoids_optimal_k})",
+        km_labels = trainer_km.fit_predict(train_matrix)
+        km_metrics = evaluate_clustering(
+            train_matrix,
+            km_labels,
+            model_name=f"K-Medoids ({metric_name}, K={kmedoids_optimal_k})",
             compute_dunn=False,
         )
-        bang_thuoc_do_kmedoids.append(
+        kmedoids_metric_rows.append(
             {
-                "Metric": thuoc_do,
+                "Metric": metric_name,
                 "K": kmedoids_optimal_k,
                 "Total_Cost": round(float(trainer_km.total_cost_), 4),
-                "Silhouette": chi_so_km["silhouette"],
-                "Davies_Bouldin": chi_so_km["davies_bouldin"],
-                "Calinski_Harabasz": chi_so_km["calinski_harabasz"],
+                "Silhouette": km_metrics["silhouette"],
+                "Davies_Bouldin": km_metrics["davies_bouldin"],
+                "Calinski_Harabasz": km_metrics["calinski_harabasz"],
             }
         )
-        if thuoc_do == "euclidean":
+        if metric_name == "euclidean":
             kmedoids_trainer = trainer_km
-    pd.DataFrame(bang_thuoc_do_kmedoids).to_csv(METRICS_DIR / "kmedoids_metric_comparison.csv", index=False)
+    pd.DataFrame(kmedoids_metric_rows).to_csv(METRICS_DIR / "kmedoids_metric_comparison.csv", index=False)
     kmedoids_labels = kmedoids_trainer.labels_
 
     logger.info(f"Hoàn tất Bước 3 với K tối ưu từ K-Means Baseline = {optimal_k}.")
@@ -361,8 +361,8 @@ def step_3_clustering_experiments(ma_tran_train: Any) -> Dict[str, Any]:
 def step_4_evaluation_and_profiling(
     train_df: pd.DataFrame,
     test_df: pd.DataFrame,
-    ma_tran_train: Any,
-    ma_tran_test: Any,
+    train_matrix: Any,
+    test_matrix: Any,
     scaler: FeatureScaler,
     clustering_results: Dict[str, Any],
 ) -> Dict[str, Any]:
@@ -376,28 +376,28 @@ def step_4_evaluation_and_profiling(
     kmeans_model = clustering_results["kmeans_model"]
 
     # So sánh đối đầu 4 thuật toán trên tập Train
-    ket_qua_danh_gia = [
-        evaluate_clustering(ma_tran_train, clustering_results["kmeans_labels"], f"K-Means (K={optimal_k})"),
-        evaluate_clustering(ma_tran_train, clustering_results["hierarchical_labels"], f"Hierarchical Ward (K={hier_k})"),
+    eval_results = [
+        evaluate_clustering(train_matrix, clustering_results["kmeans_labels"], f"K-Means (K={optimal_k})"),
+        evaluate_clustering(train_matrix, clustering_results["hierarchical_labels"], f"Hierarchical Ward (K={hier_k})"),
         evaluate_clustering(
-            ma_tran_train,
+            train_matrix,
             clustering_results["dbscan_labels"],
             f"DBSCAN (eps={clustering_results['dbscan_params'][0]}, ms={clustering_results['dbscan_params'][1]})",
         ),
-        evaluate_clustering(ma_tran_train, clustering_results["kmedoids_labels"], f"K-Medoids (K={kmedoids_k})"),
+        evaluate_clustering(train_matrix, clustering_results["kmedoids_labels"], f"K-Medoids (K={kmedoids_k})"),
     ]
-    comparison_df = compare_all_models(ket_qua_danh_gia)
+    comparison_df = compare_all_models(eval_results)
     print("\n [BẢNG ĐỐI CHIẾU CÁC THUẬT TOÁN TRÊN TẬP TRAIN]")
     print(comparison_df.to_string(index=False))
 
     # Kiểm chứng độ ổn định phân bố cụm trên tập Holdout Test độc lập (20%) cho các mô hình quy nạp
     # (Lưu ý: không dùng chỉ số nội tại trên Holdout để suy diễn overfitting như bài toán có giám sát)
-    nhan_test_kmeans = kmeans_model.predict(ma_tran_test)
-    nhan_test_kmedoids = clustering_results["kmedoids_trainer"].predict(ma_tran_test)
+    kmeans_test_labels = kmeans_model.predict(test_matrix)
+    kmedoids_test_labels = clustering_results["kmedoids_trainer"].predict(test_matrix)
     holdout_df = pd.DataFrame(
         [
-            evaluate_clustering(ma_tran_test, nhan_test_kmeans, f"K-Means Test Holdout (K={optimal_k})"),
-            evaluate_clustering(ma_tran_test, nhan_test_kmedoids, f"K-Medoids Test Holdout (K={kmedoids_k})"),
+            evaluate_clustering(test_matrix, kmeans_test_labels, f"K-Means Test Holdout (K={optimal_k})"),
+            evaluate_clustering(test_matrix, kmedoids_test_labels, f"K-Medoids Test Holdout (K={kmedoids_k})"),
         ]
     )
     holdout_df.to_csv(METRICS_DIR / "holdout_test_evaluation.csv", index=False)
@@ -405,11 +405,11 @@ def step_4_evaluation_and_profiling(
     print(holdout_df[["model_name", "n_clusters", "silhouette", "davies_bouldin", "calinski_harabasz"]].to_string(index=False))
 
     # Trực quan hóa mô hình Baseline chính (K-Means) và DBSCAN
-    tam_cum_goc = scaler.inverse_transform(kmeans_model.cluster_centers_)
+    original_centroids = scaler.inverse_transform(kmeans_model.cluster_centers_)
     plot_clusters_2d(
         train_df,
         clustering_results["kmeans_labels"],
-        centroids=tam_cum_goc,
+        centroids=original_centroids,
         title=f"Phân Cụm Khách Hàng K-Means (K={optimal_k}) - Thu Nhập & Chi Tiêu",
         filename="02_clusters_2d.png",
     )
@@ -427,7 +427,7 @@ def step_4_evaluation_and_profiling(
         filename="03_clusters_3d.png",
     )
     plot_silhouette_analysis(
-        ma_tran_train,
+        train_matrix,
         clustering_results["kmeans_labels"],
         optimal_k=optimal_k,
         filename="05_silhouette_analysis.png",
@@ -480,19 +480,19 @@ def step_5_save_and_inference(
     save_model(final_model, scaler, model_name="final_kmeans_pipeline.pkl", metadata=metadata)
 
     predictor = CustomerSegmentPredictor("final_kmeans_pipeline.pkl")
-    vi_du_kh = predictor.predict_single_customer(age=35, annual_income=75000.0, total_spending=1400.0)
+    sample_prediction = predictor.predict_single_customer(age=35, annual_income=75000.0, total_spending=1400.0)
     print(" [THỬ NGHIỆM DỰ ĐOÁN 1 KHÁCH HÀNG MỚI]")
     print(
-        f" Đầu vào: {vi_du_kh['customer_input']}\n"
-        f" -> Cụm dự đoán: {vi_du_kh['assigned_cluster']} ({vi_du_kh['persona_name']})\n"
-        f" -> Khoảng cách tới tâm cụm (không gian chuẩn hóa): {vi_du_kh['distance_to_center']}\n"
-        f" -> Gợi ý: {vi_du_kh['marketing_recommendation']}"
+        f" Đầu vào: {sample_prediction['customer_input']}\n"
+        f" -> Cụm dự đoán: {sample_prediction['assigned_cluster']} ({sample_prediction['persona_name']})\n"
+        f" -> Khoảng cách tới tâm cụm (không gian chuẩn hóa): {sample_prediction['distance_to_center']}\n"
+        f" -> Gợi ý: {sample_prediction['marketing_recommendation']}"
     )
 
     test_pred_df = predictor.predict_batch(test_df)
     test_pred_df.to_csv(METRICS_DIR / "test_predictions.csv", index=False)
     logger.info("Hoàn tất Bước 5 (Lưu trữ & Suy luận thử nghiệm).")
-    return vi_du_kh
+    return sample_prediction
 
 
 def main():
@@ -505,13 +505,13 @@ def main():
 
     raw_df, train_df, test_df = step_0_data_ingestion()
     step_1_data_exploration(train_df, raw_df=raw_df)
-    scaler, ma_tran_train, ma_tran_test = step_2_feature_scaling(train_df, test_df)
-    clustering_results = step_3_clustering_experiments(ma_tran_train)
+    scaler, train_matrix, test_matrix = step_2_feature_scaling(train_df, test_df)
+    clustering_results = step_3_clustering_experiments(train_matrix)
     eval_outputs = step_4_evaluation_and_profiling(
         train_df,
         test_df,
-        ma_tran_train,
-        ma_tran_test,
+        train_matrix,
+        test_matrix,
         scaler,
         clustering_results,
     )
