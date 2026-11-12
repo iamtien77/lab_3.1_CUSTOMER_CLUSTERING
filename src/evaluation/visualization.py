@@ -40,27 +40,27 @@ _FEATURE_LABELS = {
 }
 
 
-def _nhan_truc(ten_cot: str) -> str:
+def _axis_label(col_name: str) -> str:
     """Trả về nhãn trục biểu đồ kèm đơn vị rõ ràng theo chuẩn thiết kế."""
-    return _FEATURE_LABELS.get(ten_cot, ten_cot)
+    return _FEATURE_LABELS.get(col_name, col_name)
 
 
-def _hoan_tat_bieu_do(
+def _finalize_figure(
     fig: plt.Figure,
     filename: str,
     output_dir: Optional[Path | str] = None,
 ) -> Path:
     """Lưu biểu đồ ra thư mục đích (hoặc FIGURES_DIR mặc định) và đóng Figure giải phóng RAM."""
     if output_dir is not None:
-        duong_dan = Path(output_dir) / filename
-        duong_dan.parent.mkdir(parents=True, exist_ok=True)
+        saved_path = Path(output_dir) / filename
+        saved_path.parent.mkdir(parents=True, exist_ok=True)
         fig.tight_layout()
-        fig.savefig(duong_dan, dpi=200, bbox_inches="tight")
-        print(f" [ĐÃ LƯU BIỂU ĐỒ] -> {duong_dan}")
+        fig.savefig(saved_path, dpi=200, bbox_inches="tight")
+        print(f" [ĐÃ LƯU BIỂU ĐỒ] -> {saved_path}")
     else:
-        duong_dan = save_figure(filename)
+        saved_path = save_figure(filename)
     plt.close(fig)
-    return duong_dan
+    return saved_path
 
 
 def plot_eda_distributions(
@@ -69,37 +69,37 @@ def plot_eda_distributions(
     output_dir: Optional[Path | str] = None,
 ) -> Path:
     """Vẽ Histogram/KDE và Boxplot cho 3 đặc trưng số Age, Income, Total_Spending."""
-    cot_hien_thi = [col for col in NUMERICAL_FEATURES if col in df.columns]
-    fig, axes = plt.subplots(2, len(cot_hien_thi), figsize=(5 * len(cot_hien_thi), 8))
-    if len(cot_hien_thi) == 1:
+    display_cols = [col for col in NUMERICAL_FEATURES if col in df.columns]
+    fig, axes = plt.subplots(2, len(display_cols), figsize=(5 * len(display_cols), 8))
+    if len(display_cols) == 1:
         axes = np.array([[axes[0]], [axes[1]]])
 
-    for i, col in enumerate(cot_hien_thi):
-        nhan_co_don_vi = _nhan_truc(col)
+    for i, col in enumerate(display_cols):
+        axis_label_text = _axis_label(col)
         sns.histplot(df[col].dropna(), kde=True, ax=axes[0, i], color=STYLE["blue"])
-        axes[0, i].set_title(f"Phân phối {nhan_co_don_vi}")
-        axes[0, i].set_xlabel(nhan_co_don_vi)
+        axes[0, i].set_title(f"Phân phối {axis_label_text}")
+        axes[0, i].set_xlabel(axis_label_text)
         axes[0, i].set_ylabel("Tần suất (khách hàng)")
         axes[0, i].xaxis.set_major_locator(MaxNLocator(nbins=5))
 
         sns.boxplot(x=df[col].dropna(), ax=axes[1, i], color=STYLE["soft_blue"])
-        axes[1, i].set_title(f"Boxplot phát hiện ngoại lai: {nhan_co_don_vi}")
-        axes[1, i].set_xlabel(nhan_co_don_vi)
+        axes[1, i].set_title(f"Boxplot phát hiện ngoại lai: {axis_label_text}")
+        axes[1, i].set_xlabel(axis_label_text)
         axes[1, i].xaxis.set_major_locator(MaxNLocator(nbins=5))
 
         if col in (INCOME_COLUMN, SPENDING_COLUMN):
-            dinh_dang_tien = FuncFormatter(
+            currency_formatter = FuncFormatter(
                 lambda val, _: (
                     f"{val / 1000:.1f}k".replace(".0k", "k")
                     if abs(val) >= 1000
                     else f"{val:g}"
                 )
             )
-            axes[0, i].xaxis.set_major_formatter(dinh_dang_tien)
-            axes[1, i].xaxis.set_major_formatter(dinh_dang_tien)
+            axes[0, i].xaxis.set_major_formatter(currency_formatter)
+            axes[1, i].xaxis.set_major_formatter(currency_formatter)
 
     fig.suptitle("Khám Phá Phân Phối Và Ngoại Lai Các Đặc Trưng Khách Hàng", fontsize=14, fontweight="bold")
-    return _hoan_tat_bieu_do(fig, filename, output_dir)
+    return _finalize_figure(fig, filename, output_dir)
 
 
 def plot_eda_correlations(
@@ -112,22 +112,22 @@ def plot_eda_correlations(
 
     axes[0, 0].scatter(df[INCOME_COLUMN], df[SPENDING_COLUMN], alpha=0.6, color=STYLE["blue"], edgecolors="none")
     axes[0, 0].set_title(f"Tương quan Thu nhập và Tổng chi tiêu")
-    axes[0, 0].set_xlabel(_nhan_truc(INCOME_COLUMN))
-    axes[0, 0].set_ylabel(_nhan_truc(SPENDING_COLUMN))
+    axes[0, 0].set_xlabel(_axis_label(INCOME_COLUMN))
+    axes[0, 0].set_ylabel(_axis_label(SPENDING_COLUMN))
 
     axes[0, 1].scatter(df[AGE_COLUMN], df[SPENDING_COLUMN], alpha=0.6, color=STYLE["secondary"], edgecolors="none")
     axes[0, 1].set_title(f"Tương quan Tuổi và Tổng chi tiêu")
-    axes[0, 1].set_xlabel(_nhan_truc(AGE_COLUMN))
-    axes[0, 1].set_ylabel(_nhan_truc(SPENDING_COLUMN))
+    axes[0, 1].set_xlabel(_axis_label(AGE_COLUMN))
+    axes[0, 1].set_ylabel(_axis_label(SPENDING_COLUMN))
 
-    cot_so = [col for col in NUMERICAL_FEATURES if col in df.columns]
-    corr = df[cot_so].corr()
+    numeric_cols = [col for col in NUMERICAL_FEATURES if col in df.columns]
+    corr = df[numeric_cols].corr()
     sns.heatmap(corr, annot=True, fmt=".2f", cmap="Blues", ax=axes[1, 0], square=True)
     axes[1, 0].set_title("Ma trận hệ số tương quan Pearson")
 
     if "Education" in df.columns:
-        dem_hoc_van = df["Education"].value_counts()
-        axes[1, 1].bar(dem_hoc_van.index, dem_hoc_van.values, color=STYLE["primary"])
+        education_counts = df["Education"].value_counts()
+        axes[1, 1].bar(education_counts.index, education_counts.values, color=STYLE["primary"])
         axes[1, 1].set_title("Phân bố trình độ học vấn (Education)")
         axes[1, 1].set_ylabel("Số khách hàng")
         axes[1, 1].tick_params(axis="x", rotation=20)
@@ -135,43 +135,43 @@ def plot_eda_correlations(
         axes[1, 1].axis("off")
 
     fig.suptitle("Phân Tích Quan Hệ Song Biến Và Nhân Khẩu Học", fontsize=14, fontweight="bold")
-    return _hoan_tat_bieu_do(fig, filename, output_dir)
+    return _finalize_figure(fig, filename, output_dir)
 
 
 def plot_scaling_comparison(
     df_raw: pd.DataFrame,
-    ma_tran_scaled: np.ndarray,
+    scaled_matrix: np.ndarray,
     feature_cols: List[str] = NUMERICAL_FEATURES,
     filename: str = "00c_scaling_comparison.png",
     output_dir: Optional[Path | str] = None,
     scaled_variants: Optional[Dict[str, np.ndarray]] = None,
 ) -> Path:
     """So sánh trực quan phân phối dữ liệu trước và sau chuẩn hóa qua StandardScaler, MinMaxScaler và RobustScaler."""
-    cot_hop_le = [col for col in feature_cols if col in df_raw.columns]
-    ma_tran_standard = np.asarray(ma_tran_scaled, dtype=np.float64)
+    valid_cols = [col for col in feature_cols if col in df_raw.columns]
+    standard_matrix = np.asarray(scaled_matrix, dtype=np.float64)
     if scaled_variants is None:
-        cac_bien_the: Dict[str, np.ndarray] = {
-            "StandardScaler (Mean=0, Std=1)": ma_tran_standard,
+        variant_matrices: Dict[str, np.ndarray] = {
+            "StandardScaler (Mean=0, Std=1)": standard_matrix,
         }
-        if len(df_raw) >= 2 and cot_hop_le:
-            ma_tran_goc = df_raw[cot_hop_le].to_numpy(dtype=np.float64)
-            if np.all(np.isfinite(ma_tran_goc)):
-                cac_bien_the["MinMaxScaler (Đưa về [0, 1])"] = MinMaxScaler().fit_transform(ma_tran_goc)
-                cac_bien_the["RobustScaler (Median=0, IQR=1)"] = RobustScaler().fit_transform(ma_tran_goc)
+        if len(df_raw) >= 2 and valid_cols:
+            raw_matrix = df_raw[valid_cols].to_numpy(dtype=np.float64)
+            if np.all(np.isfinite(raw_matrix)):
+                variant_matrices["MinMaxScaler (Đưa về [0, 1])"] = MinMaxScaler().fit_transform(raw_matrix)
+                variant_matrices["RobustScaler (Median=0, IQR=1)"] = RobustScaler().fit_transform(raw_matrix)
     else:
-        cac_bien_the = scaled_variants
+        variant_matrices = scaled_variants
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 9))
-    bang_mau = CLUSTER_PALETTE[:3]
+    palette_colors = CLUSTER_PALETTE[:3]
 
     ax_raw = axes[0, 0]
-    for idx, col in enumerate(cot_hop_le):
-        mau = bang_mau[idx % len(bang_mau)]
+    for idx, col in enumerate(valid_cols):
+        color = palette_colors[idx % len(palette_colors)]
         sns.kdeplot(
             df_raw[col],
             ax=ax_raw,
-            label=_nhan_truc(col),
-            color=mau,
+            label=_axis_label(col),
+            color=color,
             linewidth=2.0,
             warn_singular=False,
         )
@@ -190,7 +190,7 @@ def plot_scaling_comparison(
     )
     ax_raw.grid(True, alpha=0.25)
     ax_raw.legend(loc="upper right", fontsize=8)
-    if len(cot_hop_le) >= 2:
+    if len(valid_cols) >= 2:
         ax_raw.text(
             0.03,
             0.78,
@@ -200,39 +200,39 @@ def plot_scaling_comparison(
             bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="#cccccc", alpha=0.9),
         )
 
-    vi_tri_axes = [axes[0, 1], axes[1, 0], axes[1, 1]]
-    for ax_pos in vi_tri_axes:
+    subplot_axes = [axes[0, 1], axes[1, 0], axes[1, 1]]
+    for ax_pos in subplot_axes:
         ax_pos.set_visible(False)
 
-    nhan_truc_x = [
+    x_axis_labels = [
         "Giá trị chuẩn hóa Z-score",
         "Giá trị chuẩn hóa [0, 1]",
         "Giá trị chuẩn hóa theo Median / IQR",
     ]
-    for idx_panel, (tieu_de_pp, ma_tran_pp) in enumerate(list(cac_bien_the.items())[:3]):
-        ax = vi_tri_axes[idx_panel]
+    for panel_idx, (method_title, method_matrix) in enumerate(list(variant_matrices.items())[:3]):
+        ax = subplot_axes[panel_idx]
         ax.set_visible(True)
-        arr_pp = np.asarray(ma_tran_pp, dtype=np.float64)
-        for idx_col, col in enumerate(cot_hop_le):
-            if idx_col < arr_pp.shape[1]:
-                mau = bang_mau[idx_col % len(bang_mau)]
+        method_array = np.asarray(method_matrix, dtype=np.float64)
+        for col_idx, col in enumerate(valid_cols):
+            if col_idx < method_array.shape[1]:
+                color = palette_colors[col_idx % len(palette_colors)]
                 sns.kdeplot(
-                    arr_pp[:, idx_col],
+                    method_array[:, col_idx],
                     ax=ax,
-                    label=_nhan_truc(col),
-                    color=mau,
+                    label=_axis_label(col),
+                    color=color,
                     linewidth=2.0,
                     warn_singular=False,
                 )
         ax.axvline(0.0, color="#666666", linestyle=":", linewidth=1.0)
-        ax.set_title(f"{idx_panel + 2}. Sau {tieu_de_pp}")
-        ax.set_xlabel(nhan_truc_x[idx_panel] if idx_panel < len(nhan_truc_x) else "Giá trị sau chuẩn hóa")
+        ax.set_title(f"{panel_idx + 2}. Sau {method_title}")
+        ax.set_xlabel(x_axis_labels[panel_idx] if panel_idx < len(x_axis_labels) else "Giá trị sau chuẩn hóa")
         ax.set_ylabel("Mật độ (KDE)")
         ax.grid(True, alpha=0.25)
         ax.legend(loc="upper right", fontsize=8)
 
     fig.suptitle("So Sánh Thang Đo Gốc Và Ba Phương Pháp Chuẩn Hóa Đặc Trưng", fontsize=14, fontweight="bold")
-    return _hoan_tat_bieu_do(fig, filename, output_dir)
+    return _finalize_figure(fig, filename, output_dir)
 
 
 def plot_elbow_and_silhouette(
@@ -257,14 +257,14 @@ def plot_elbow_and_silhouette(
     axes[1].set_ylabel("Silhouette Score")
 
     if optimal_k is not None and optimal_k in set(k_search_df["K"]):
-        dong_opt = k_search_df[k_search_df["K"] == optimal_k].iloc[0]
-        for ax, cot in [(axes[0], "Inertia"), (axes[1], "Silhouette")]:
+        optimal_row = k_search_df[k_search_df["K"] == optimal_k].iloc[0]
+        for ax, metric_col in [(axes[0], "Inertia"), (axes[1], "Silhouette")]:
             ax.axvline(optimal_k, color=STYLE["red"], linestyle="--", alpha=0.8, label=f"K đề xuất = {optimal_k}")
-            ax.scatter([optimal_k], [dong_opt[cot]], color=STYLE["red"], s=90, zorder=5)
+            ax.scatter([optimal_k], [optimal_row[metric_col]], color=STYLE["red"], s=90, zorder=5)
             ax.legend()
 
     fig.suptitle("Khảo Sát Số Cụm Tối Ưu K-Means", fontsize=14, fontweight="bold")
-    return _hoan_tat_bieu_do(fig, filename, output_dir)
+    return _finalize_figure(fig, filename, output_dir)
 
 
 def plot_clusters_2d(
@@ -279,19 +279,19 @@ def plot_clusters_2d(
 ) -> Path:
     """Vẽ biểu đồ phân tán 2D các cụm kèm tâm cụm (nếu truyền vào ở đơn vị gốc)."""
     fig, ax = plt.subplots(figsize=(10, 6))
-    nhan_arr = np.asarray(labels)
-    cac_cum = sorted([c for c in np.unique(nhan_arr) if c != -1])
+    label_array = np.asarray(labels)
+    cluster_ids = sorted([c for c in np.unique(label_array) if c != -1])
 
-    for i, cum_id in enumerate(cac_cum):
-        mask = nhan_arr == cum_id
-        mau = CLUSTER_PALETTE[i % len(CLUSTER_PALETTE)]
-        ax.scatter(df.loc[mask, x_col], df.loc[mask, y_col], s=35, alpha=0.75, color=mau, label=f"Cụm {cum_id}")
+    for i, cluster_id in enumerate(cluster_ids):
+        mask = label_array == cluster_id
+        color = CLUSTER_PALETTE[i % len(CLUSTER_PALETTE)]
+        ax.scatter(df.loc[mask, x_col], df.loc[mask, y_col], s=35, alpha=0.75, color=color, label=f"Cụm {cluster_id}")
 
-    if -1 in nhan_arr:
-        mask_nhieu = nhan_arr == -1
+    if -1 in label_array:
+        noise_mask = label_array == -1
         ax.scatter(
-            df.loc[mask_nhieu, x_col],
-            df.loc[mask_nhieu, y_col],
+            df.loc[noise_mask, x_col],
+            df.loc[noise_mask, y_col],
             s=30,
             color="#64748B",
             marker="x",
@@ -300,13 +300,13 @@ def plot_clusters_2d(
 
     if centroids is not None and len(centroids) > 0:
         if centroids.shape[1] == len(NUMERICAL_FEATURES):
-            cot_x_idx = NUMERICAL_FEATURES.index(x_col) if x_col in NUMERICAL_FEATURES else 1
-            cot_y_idx = NUMERICAL_FEATURES.index(y_col) if y_col in NUMERICAL_FEATURES else 2
+            x_col_idx = NUMERICAL_FEATURES.index(x_col) if x_col in NUMERICAL_FEATURES else 1
+            y_col_idx = NUMERICAL_FEATURES.index(y_col) if y_col in NUMERICAL_FEATURES else 2
         else:
-            cot_x_idx, cot_y_idx = 0, min(1, centroids.shape[1] - 1)
+            x_col_idx, y_col_idx = 0, min(1, centroids.shape[1] - 1)
         ax.scatter(
-            centroids[:, cot_x_idx],
-            centroids[:, cot_y_idx],
+            centroids[:, x_col_idx],
+            centroids[:, y_col_idx],
             s=220,
             c=STYLE["red"],
             marker="*",
@@ -317,10 +317,10 @@ def plot_clusters_2d(
         )
 
     ax.set_title(title)
-    ax.set_xlabel(_nhan_truc(x_col))
-    ax.set_ylabel(_nhan_truc(y_col))
+    ax.set_xlabel(_axis_label(x_col))
+    ax.set_ylabel(_axis_label(y_col))
     ax.legend(loc="best")
-    return _hoan_tat_bieu_do(fig, filename, output_dir)
+    return _finalize_figure(fig, filename, output_dir)
 
 
 def plot_clusters_3d(
@@ -333,29 +333,29 @@ def plot_clusters_3d(
     """Vẽ phân tán 3D trên không gian Age x Income x Total_Spending."""
     fig = plt.figure(figsize=(10, 7))
     ax = fig.add_subplot(111, projection="3d")
-    nhan_arr = np.asarray(labels)
-    cac_cum = sorted([c for c in np.unique(nhan_arr) if c != -1])
+    label_array = np.asarray(labels)
+    cluster_ids = sorted([c for c in np.unique(label_array) if c != -1])
 
-    for i, cum_id in enumerate(cac_cum):
-        mask = nhan_arr == cum_id
-        mau = CLUSTER_PALETTE[i % len(CLUSTER_PALETTE)]
+    for i, cluster_id in enumerate(cluster_ids):
+        mask = label_array == cluster_id
+        color = CLUSTER_PALETTE[i % len(CLUSTER_PALETTE)]
         ax.scatter(
             df.loc[mask, AGE_COLUMN],
             df.loc[mask, INCOME_COLUMN],
             df.loc[mask, SPENDING_COLUMN],
             s=28,
             alpha=0.75,
-            color=mau,
-            label=f"Cụm {cum_id}",
+            color=color,
+            label=f"Cụm {cluster_id}",
         )
 
     ax.set_title(title)
-    ax.set_xlabel(_nhan_truc(AGE_COLUMN))
-    ax.set_ylabel(_nhan_truc(INCOME_COLUMN))
-    ax.set_zlabel(_nhan_truc(SPENDING_COLUMN))
+    ax.set_xlabel(_axis_label(AGE_COLUMN))
+    ax.set_ylabel(_axis_label(INCOME_COLUMN))
+    ax.set_zlabel(_axis_label(SPENDING_COLUMN))
     ax.view_init(elev=20, azim=45)
     ax.legend(loc="best")
-    return _hoan_tat_bieu_do(fig, filename, output_dir)
+    return _finalize_figure(fig, filename, output_dir)
 
 
 def plot_dendrogram(
@@ -382,61 +382,61 @@ def plot_dendrogram(
     ax.set_title("Biểu Đồ Cây Phân Cấp Khách Hàng (Hierarchical Dendrogram)")
     ax.set_xlabel("Nhánh cụm (số lượng điểm trong ngoặc)")
     ax.set_ylabel("Khoảng cách hợp nhất (Euclidean / Ward)")
-    return _hoan_tat_bieu_do(fig, filename, output_dir)
+    return _finalize_figure(fig, filename, output_dir)
 
 
 def plot_silhouette_analysis(
-    ma_tran_scaled: np.ndarray,
+    scaled_matrix: np.ndarray,
     labels: np.ndarray,
     optimal_k: Optional[int] = None,
     filename: str = "05_silhouette_analysis.png",
     output_dir: Optional[Path | str] = None,
 ) -> Path:
     """Vẽ biểu đồ lưỡi dao Silhouette (Silhouette Knife Plot) chi tiết theo từng cụm."""
-    ma_tran = np.asarray(ma_tran_scaled, dtype=np.float64)
-    nhan_arr = np.asarray(labels)
-    mask = nhan_arr != -1
-    ma_tran_hop_le, nhan_hop_le = ma_tran[mask], nhan_arr[mask]
-    cac_cum = sorted(np.unique(nhan_hop_le))
+    matrix = np.asarray(scaled_matrix, dtype=np.float64)
+    label_array = np.asarray(labels)
+    mask = label_array != -1
+    valid_matrix, valid_labels = matrix[mask], label_array[mask]
+    cluster_ids = sorted(np.unique(valid_labels))
 
     fig, ax = plt.subplots(figsize=(9, 6))
-    if len(cac_cum) < 2:
+    if len(cluster_ids) < 2:
         ax.text(0.5, 0.5, "Không đủ cụm (>= 2) để vẽ Silhouette Plot", ha="center", va="center")
-        return _hoan_tat_bieu_do(fig, filename, output_dir)
+        return _finalize_figure(fig, filename, output_dir)
 
-    silhouette_trung_binh = float(silhouette_score(ma_tran_hop_le, nhan_hop_le))
-    silhouette_mau = silhouette_samples(ma_tran_hop_le, nhan_hop_le)
-    so_cum = len(cac_cum) if optimal_k is None else optimal_k
+    avg_silhouette = float(silhouette_score(valid_matrix, valid_labels))
+    sample_silhouettes = silhouette_samples(valid_matrix, valid_labels)
+    n_clusters = len(cluster_ids) if optimal_k is None else optimal_k
 
-    x_min = min(-0.24, float(silhouette_mau.min()) - 0.14)
-    x_max = min(1.05, max(0.85, float(silhouette_mau.max()) + 0.08))
-    y_duoi = 10
-    for idx, cum_id in enumerate(cac_cum):
-        gia_tri_cum = np.sort(silhouette_mau[nhan_hop_le == cum_id])
-        y_tren = y_duoi + len(gia_tri_cum)
-        mau = CLUSTER_PALETTE[idx % len(CLUSTER_PALETTE)] if idx < len(CLUSTER_PALETTE) else cm.nipy_spectral(float(idx) / max(so_cum, 1))
-        ax.fill_betweenx(np.arange(y_duoi, y_tren), 0, gia_tri_cum, facecolor=mau, edgecolor=mau, alpha=0.75)
+    x_min = min(-0.24, float(sample_silhouettes.min()) - 0.14)
+    x_max = min(1.05, max(0.85, float(sample_silhouettes.max()) + 0.08))
+    y_lower = 10
+    for idx, cluster_id in enumerate(cluster_ids):
+        cluster_values = np.sort(sample_silhouettes[valid_labels == cluster_id])
+        y_upper = y_lower + len(cluster_values)
+        color = CLUSTER_PALETTE[idx % len(CLUSTER_PALETTE)] if idx < len(CLUSTER_PALETTE) else cm.nipy_spectral(float(idx) / max(n_clusters, 1))
+        ax.fill_betweenx(np.arange(y_lower, y_upper), 0, cluster_values, facecolor=color, edgecolor=color, alpha=0.75)
         ax.text(
             x_min + 0.015,
-            y_duoi + 0.5 * len(gia_tri_cum),
-            f"Cụm {cum_id}\n(n={len(gia_tri_cum):,})",
+            y_lower + 0.5 * len(cluster_values),
+            f"Cụm {cluster_id}\n(n={len(cluster_values):,})",
             va="center",
             ha="left",
             fontsize=9,
             fontweight="bold",
             bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="#cccccc", alpha=0.9),
         )
-        y_duoi = y_tren + 10
+        y_lower = y_upper + 10
 
-    ax.axvline(x=silhouette_trung_binh, color=STYLE["red"], linestyle="--", linewidth=1.8, label=f"Silhouette TB = {silhouette_trung_binh:.4f}")
+    ax.axvline(x=avg_silhouette, color=STYLE["red"], linestyle="--", linewidth=1.8, label=f"Silhouette TB = {avg_silhouette:.4f}")
     ax.axvline(x=0.0, color="black", linestyle=":", linewidth=1.0)
     ax.set_xlim(x_min, x_max)
-    ax.set_title(f"Phân Tích Silhouette Chi Tiết Cho {len(cac_cum)} Cụm")
+    ax.set_title(f"Phân Tích Silhouette Chi Tiết Cho {len(cluster_ids)} Cụm")
     ax.set_xlabel("Giá trị hệ số Silhouette")
     ax.set_ylabel("Phân bố các mẫu theo từng cụm")
     ax.set_yticks([])
     ax.legend(loc="best")
-    return _hoan_tat_bieu_do(fig, filename, output_dir)
+    return _finalize_figure(fig, filename, output_dir)
 
 
 def plot_dbscan_k_distance(
@@ -451,4 +451,4 @@ def plot_dbscan_k_distance(
     ax.set_title(f"Đồ Thị Khoảng Cách Láng Giềng Thứ {k} (Gợi Ý Tham Số eps Cho DBSCAN)")
     ax.set_xlabel("Chỉ số điểm dữ liệu (đã sắp xếp)")
     ax.set_ylabel(f"Khoảng cách tới điểm gần thứ {k}")
-    return _hoan_tat_bieu_do(fig, filename, output_dir)
+    return _finalize_figure(fig, filename, output_dir)

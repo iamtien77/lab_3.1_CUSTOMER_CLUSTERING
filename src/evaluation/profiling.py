@@ -26,13 +26,13 @@ from src.config import (
 
 def _mode_or_na(series: pd.Series) -> str:
     """Lấy giá trị xuất hiện nhiều nhất của cột phân loại kèm tỷ lệ %."""
-    hop_le = series.dropna()
-    if hop_le.empty:
+    valid_values = series.dropna()
+    if valid_values.empty:
         return "N/A"
-    gia_tri = hop_le.value_counts()
-    ten_pho_bien = gia_tri.index[0]
-    ty_le = gia_tri.iloc[0] / len(hop_le) * 100.0
-    return f"{ten_pho_bien} ({ty_le:.1f}%)"
+    counts = valid_values.value_counts()
+    top_value = counts.index[0]
+    top_pct = counts.iloc[0] / len(valid_values) * 100.0
+    return f"{top_value} ({top_pct:.1f}%)"
 
 
 def create_cluster_profiles(
@@ -43,63 +43,63 @@ def create_cluster_profiles(
     """
     Tổng hợp bảng thống kê mô tả chi tiết cho từng cụm và lưu ra tệp CSV.
     """
-    nhan_arr = np.asarray(labels)
-    if len(df) != len(nhan_arr):
-        raise ValueError(f"Số dòng DataFrame ({len(df)}) không khớp số nhãn ({len(nhan_arr)}).")
+    label_array = np.asarray(labels)
+    if len(df) != len(label_array):
+        raise ValueError(f"Số dòng DataFrame ({len(df)}) không khớp số nhãn ({len(label_array)}).")
 
-    df_gan_nhan = df.copy()
-    df_gan_nhan["Cluster"] = nhan_arr
-    tong_so = max(len(df_gan_nhan), 1)
+    labeled_df = df.copy()
+    labeled_df["Cluster"] = label_array
+    total_count = max(len(labeled_df), 1)
 
-    cac_dong = []
+    profile_rows = []
     # Sắp xếp cụm thường theo thứ tự tăng dần và đặt nhiễu (-1) ở cuối nếu có
-    cac_cum = sorted([c for c in df_gan_nhan["Cluster"].unique() if c != -1])
-    if -1 in df_gan_nhan["Cluster"].values:
-        cac_cum.append(-1)
+    cluster_ids = sorted([cluster_val for cluster_val in labeled_df["Cluster"].unique() if cluster_val != -1])
+    if -1 in labeled_df["Cluster"].values:
+        cluster_ids.append(-1)
 
-    for cum_id in cac_cum:
-        nhom = df_gan_nhan[df_gan_nhan["Cluster"] == cum_id]
-        dong = {
-            "Cluster": int(cum_id),
-            "Số lượng": int(len(nhom)),
-            "Tỷ lệ (%)": round(len(nhom) / tong_so * 100.0, 2),
-            "Tuổi TB": round(float(nhom[AGE_COLUMN].mean()), 2),
-            "Tuổi Trung vị": round(float(nhom[AGE_COLUMN].median()), 2),
-            "Thu nhập TB": round(float(nhom[INCOME_COLUMN].mean()), 2),
-            "Thu nhập Trung vị": round(float(nhom[INCOME_COLUMN].median()), 2),
-            "Chi tiêu TB": round(float(nhom[SPENDING_COLUMN].mean()), 2),
-            "Chi tiêu Trung vị": round(float(nhom[SPENDING_COLUMN].median()), 2),
+    for cluster_id in cluster_ids:
+        cluster_df = labeled_df[labeled_df["Cluster"] == cluster_id]
+        row_dict = {
+            "Cluster": int(cluster_id),
+            "Số lượng": int(len(cluster_df)),
+            "Tỷ lệ (%)": round(len(cluster_df) / total_count * 100.0, 2),
+            "Tuổi TB": round(float(cluster_df[AGE_COLUMN].mean()), 2),
+            "Tuổi Trung vị": round(float(cluster_df[AGE_COLUMN].median()), 2),
+            "Thu nhập TB": round(float(cluster_df[INCOME_COLUMN].mean()), 2),
+            "Thu nhập Trung vị": round(float(cluster_df[INCOME_COLUMN].median()), 2),
+            "Chi tiêu TB": round(float(cluster_df[SPENDING_COLUMN].mean()), 2),
+            "Chi tiêu Trung vị": round(float(cluster_df[SPENDING_COLUMN].median()), 2),
         }
-        if "Education" in nhom.columns:
-            dong["Học vấn phổ biến"] = _mode_or_na(nhom["Education"])
-        if "Marital_Status" in nhom.columns:
-            dong["Hôn nhân phổ biến"] = _mode_or_na(nhom["Marital_Status"])
-        if all(col in nhom.columns for col in SPENDING_COMPONENT_COLUMNS):
-            trung_binh_danh_muc = nhom[SPENDING_COMPONENT_COLUMNS].mean()
-            ten_top = str(trung_binh_danh_muc.idxmax())
-            dong["Danh mục chi chính"] = f"{ten_top} (TB: {trung_binh_danh_muc[ten_top]:,.1f})"
-        cac_dong.append(dong)
+        if "Education" in cluster_df.columns:
+            row_dict["Học vấn phổ biến"] = _mode_or_na(cluster_df["Education"])
+        if "Marital_Status" in cluster_df.columns:
+            row_dict["Hôn nhân phổ biến"] = _mode_or_na(cluster_df["Marital_Status"])
+        if all(col in cluster_df.columns for col in SPENDING_COMPONENT_COLUMNS):
+            category_means = cluster_df[SPENDING_COMPONENT_COLUMNS].mean()
+            top_category = str(category_means.idxmax())
+            row_dict["Danh mục chi chính"] = f"{top_category} (TB: {category_means[top_category]:,.1f})"
+        profile_rows.append(row_dict)
 
-    profile_df = pd.DataFrame(cac_dong)
-    duong_dan_luu = Path(output_path) if output_path is not None else METRICS_DIR / "cluster_profiles.csv"
-    duong_dan_luu.parent.mkdir(parents=True, exist_ok=True)
-    profile_df.to_csv(duong_dan_luu, index=False)
-    print(f" [HỒ SƠ PHÂN KHÚC] Đã lập bảng thống kê {len(profile_df)} cụm và lưu tại: {duong_dan_luu}")
+    profile_df = pd.DataFrame(profile_rows)
+    target_path = Path(output_path) if output_path is not None else METRICS_DIR / "cluster_profiles.csv"
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    profile_df.to_csv(target_path, index=False)
+    print(f" [HỒ SƠ PHÂN KHÚC] Đã lập bảng thống kê {len(profile_df)} cụm và lưu tại: {target_path}")
     return profile_df
 
 
-def _phan_muc(gia_tri: float, moc_chuan: float, bien_do: float = 0.12) -> str:
+def _classify_level(value: float, baseline: float, margin: float = 0.12) -> str:
     """Phân ngưỡng Cao / Trung bình / Thấp tương đối so với mốc trung bình toàn tập."""
-    if moc_chuan <= 0:
+    if baseline <= 0:
         return "Trung bình"
-    if gia_tri >= moc_chuan * (1.0 + bien_do):
+    if value >= baseline * (1.0 + margin):
         return "Cao"
-    if gia_tri <= moc_chuan * (1.0 - bien_do):
+    if value <= baseline * (1.0 - margin):
         return "Thấp"
     return "Trung bình"
 
 
-_CHIEN_LUOC_THEO_NHOM = {
+_GROUP_STRATEGIES = {
     ("Cao", "Cao"): (
         "Khách hàng VIP / Giá trị cao",
         "Ưu tiên chăm sóc hội viên VIP, truyền thông các danh mục chi tiêu chủ lực và cá nhân hóa ưu đãi duy trì mức chi tiêu cao.",
@@ -135,59 +135,59 @@ def generate_customer_personas(profile_df: pd.DataFrame) -> List[Dict[str, Any]]
     if profile_df.empty:
         return []
 
-    cum_hop_le = profile_df[profile_df["Cluster"] != -1]
-    if cum_hop_le.empty:
-        cum_hop_le = profile_df
+    valid_clusters_df = profile_df[profile_df["Cluster"] != -1]
+    if valid_clusters_df.empty:
+        valid_clusters_df = profile_df
 
-    tong_so = max(float(cum_hop_le["Số lượng"].sum()), 1.0)
-    tb_tuoi_chung = float((cum_hop_le["Tuổi TB"] * cum_hop_le["Số lượng"]).sum() / tong_so)
-    tb_thu_nhap_chung = float((cum_hop_le["Thu nhập TB"] * cum_hop_le["Số lượng"]).sum() / tong_so)
-    tb_chi_tieu_chung = float((cum_hop_le["Chi tiêu TB"] * cum_hop_le["Số lượng"]).sum() / tong_so)
+    total_size = max(float(valid_clusters_df["Số lượng"].sum()), 1.0)
+    overall_avg_age = float((valid_clusters_df["Tuổi TB"] * valid_clusters_df["Số lượng"]).sum() / total_size)
+    overall_avg_income = float((valid_clusters_df["Thu nhập TB"] * valid_clusters_df["Số lượng"]).sum() / total_size)
+    overall_avg_spending = float((valid_clusters_df["Chi tiêu TB"] * valid_clusters_df["Số lượng"]).sum() / total_size)
 
-    dem_ten: Dict[str, int] = {}
-    ket_qua_so_bo = []
+    name_counts: Dict[str, int] = {}
+    preliminary_results = []
     for _, row in profile_df.iterrows():
-        cum_id = int(row["Cluster"])
-        if cum_id == -1:
-            ten_persona = "Khách hàng Ngoại lai / Hành vi đặc biệt"
-            chien_luoc = "Kiểm tra thủ công lịch sử giao dịch để loại trừ dữ liệu bất thường hoặc phục vụ riêng."
+        cluster_id = int(row["Cluster"])
+        if cluster_id == -1:
+            persona_name = "Khách hàng Ngoại lai / Hành vi đặc biệt"
+            marketing_strategy = "Kiểm tra thủ công lịch sử giao dịch để loại trừ dữ liệu bất thường hoặc phục vụ riêng."
         else:
-            muc_thu_nhap = _phan_muc(float(row["Thu nhập TB"]), tb_thu_nhap_chung)
-            muc_chi_tieu = _phan_muc(float(row["Chi tiêu TB"]), tb_chi_tieu_chung)
-            ten_co_ban, chien_luoc = _CHIEN_LUOC_THEO_NHOM.get(
-                (muc_thu_nhap, muc_chi_tieu),
+            income_level = _classify_level(float(row["Thu nhập TB"]), overall_avg_income)
+            spending_level = _classify_level(float(row["Chi tiêu TB"]), overall_avg_spending)
+            base_name, marketing_strategy = _GROUP_STRATEGIES.get(
+                (income_level, spending_level),
                 (
                     "Khách hàng Tiêu chuẩn / Trung bình",
                     "Duy trì tần suất mua sắm đều đặn qua email marketing, voucher sinh nhật và tích điểm thành viên.",
                 ),
             )
-            nhan_do_tuoi = "Trẻ/Trung niên trẻ" if float(row["Tuổi TB"]) < tb_tuoi_chung - 2.0 else (
-                "Trung niên/Cao tuổi" if float(row["Tuổi TB"]) > tb_tuoi_chung + 2.0 else "Độ tuổi phổ thông"
+            age_tag = "Trẻ/Trung niên trẻ" if float(row["Tuổi TB"]) < overall_avg_age - 2.0 else (
+                "Trung niên/Cao tuổi" if float(row["Tuổi TB"]) > overall_avg_age + 2.0 else "Độ tuổi phổ thông"
             )
-            ten_persona = f"{ten_co_ban} ({nhan_do_tuoi})"
+            persona_name = f"{base_name} ({age_tag})"
 
-        dem_ten[ten_persona] = dem_ten.get(ten_persona, 0) + 1
-        ket_qua_so_bo.append((cum_id, row, ten_persona, chien_luoc))
+        name_counts[persona_name] = name_counts.get(persona_name, 0) + 1
+        preliminary_results.append((cluster_id, row, persona_name, marketing_strategy))
 
     # Gắn chỉ số phân biệt nếu có từ 2 cụm trùng tên Persona
-    stt_ten: Dict[str, int] = {}
+    name_indices: Dict[str, int] = {}
     personas: List[Dict[str, Any]] = []
-    for cum_id, row, ten_persona, chien_luoc in ket_qua_so_bo:
-        ten_cuoi = ten_persona
-        if dem_ten[ten_persona] > 1:
-            stt_ten[ten_persona] = stt_ten.get(ten_persona, 0) + 1
-            ten_cuoi = f"{ten_persona} #{stt_ten[ten_persona]}"
+    for cluster_id, row, persona_name, marketing_strategy in preliminary_results:
+        final_persona_name = persona_name
+        if name_counts[persona_name] > 1:
+            name_indices[persona_name] = name_indices.get(persona_name, 0) + 1
+            final_persona_name = f"{persona_name} #{name_indices[persona_name]}"
 
         personas.append(
             {
-                "cluster_id": cum_id,
-                "persona_name": ten_cuoi,
+                "cluster_id": cluster_id,
+                "persona_name": final_persona_name,
                 "size": int(row["Số lượng"]),
                 "pct": float(row["Tỷ lệ (%)"]),
                 "avg_age": float(row["Tuổi TB"]),
                 "avg_income": float(row["Thu nhập TB"]),
                 "avg_spending": float(row["Chi tiêu TB"]),
-                "marketing_strategy": chien_luoc,
+                "marketing_strategy": marketing_strategy,
             }
         )
 

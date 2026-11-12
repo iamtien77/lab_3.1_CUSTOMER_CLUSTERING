@@ -38,13 +38,13 @@ class KMedoidsTrainer:
         random_state: int = RANDOM_SEED,
     ):
         """Khởi tạo siêu tham số số cụm K, thước đo khoảng cách và giới hạn vòng lặp."""
-        thuoc_do = metric.lower().strip()
-        if thuoc_do not in _METRIC_MAP:
+        normalized_metric = metric.lower().strip()
+        if normalized_metric not in _METRIC_MAP:
             raise ValueError(f"Thước đo '{metric}' không hợp lệ. Chỉ hỗ trợ: {list(_METRIC_MAP.keys())}.")
 
         self.n_clusters = int(n_clusters)
-        self.metric = thuoc_do
-        self._scipy_metric = _METRIC_MAP[thuoc_do]
+        self.metric = normalized_metric
+        self._scipy_metric = _METRIC_MAP[normalized_metric]
         self.max_iter = int(max_iter)
         self.random_state = random_state
 
@@ -57,94 +57,94 @@ class KMedoidsTrainer:
         """
         Pha BUILD của PAM: chọn medoid đầu có tổng khoảng cách nhỏ nhất, các medoid sau giảm chi phí tối đa.
         """
-        so_mau = dist_matrix.shape[0]
-        chi_so_chon: List[int] = [int(np.argmin(dist_matrix.sum(axis=1)))]
-        kc_gan_nhat = dist_matrix[:, chi_so_chon[0]].copy()
+        n_samples = dist_matrix.shape[0]
+        selected_indices: List[int] = [int(np.argmin(dist_matrix.sum(axis=1)))]
+        nearest_distances = dist_matrix[:, selected_indices[0]].copy()
 
-        while len(chi_so_chon) < self.n_clusters:
+        while len(selected_indices) < self.n_clusters:
             # Ước lượng mức giảm tổng khoảng cách khi chọn thêm mỗi ứng viên
-            loi_ich = np.maximum(kc_gan_nhat[:, None] - dist_matrix, 0.0).sum(axis=0)
-            loi_ich[chi_so_chon] = -1.0
-            ung_vien_tot_nhat = int(np.argmax(loi_ich))
-            if ung_vien_tot_nhat in chi_so_chon:
-                for idx in range(so_mau):
-                    if idx not in chi_so_chon:
-                        ung_vien_tot_nhat = idx
+            cost_reductions = np.maximum(nearest_distances[:, None] - dist_matrix, 0.0).sum(axis=0)
+            cost_reductions[selected_indices] = -1.0
+            best_candidate = int(np.argmax(cost_reductions))
+            if best_candidate in selected_indices:
+                for idx in range(n_samples):
+                    if idx not in selected_indices:
+                        best_candidate = idx
                         break
-            chi_so_chon.append(ung_vien_tot_nhat)
-            kc_gan_nhat = np.minimum(kc_gan_nhat, dist_matrix[:, ung_vien_tot_nhat])
+            selected_indices.append(best_candidate)
+            nearest_distances = np.minimum(nearest_distances, dist_matrix[:, best_candidate])
 
-        return np.array(chi_so_chon, dtype=int)
+        return np.array(selected_indices, dtype=int)
 
-    def fit_predict(self, X: np.ndarray) -> np.ndarray:
+    def fit_predict(self, feature_matrix: np.ndarray) -> np.ndarray:
         """
         Huấn luyện K-Medoids (BUILD tất định & cập nhật medoid nội cụm) và trả về nhãn cụm.
         """
-        ma_tran = np.asarray(X, dtype=np.float64)
-        if ma_tran.ndim != 2:
-            raise ValueError(f"Ma trận đầu vào phải là 2 chiều, nhận được {ma_tran.ndim} chiều.")
-        if not np.all(np.isfinite(ma_tran)):
+        matrix = np.asarray(feature_matrix, dtype=np.float64)
+        if matrix.ndim != 2:
+            raise ValueError(f"Ma trận đầu vào phải là 2 chiều, nhận được {matrix.ndim} chiều.")
+        if not np.all(np.isfinite(matrix)):
             raise ValueError("Ma trận đầu vào K-Medoids chứa giá trị NaN hoặc Inf.")
 
-        so_mau = len(ma_tran)
-        if so_mau < 3:
-            raise ValueError(f"K-Medoids yêu cầu ít nhất 3 mẫu dữ liệu, nhận được {so_mau}.")
+        n_samples = len(matrix)
+        if n_samples < 3:
+            raise ValueError(f"K-Medoids yêu cầu ít nhất 3 mẫu dữ liệu, nhận được {n_samples}.")
 
-        so_diem_duy_nhat = len(np.unique(ma_tran, axis=0))
-        if self.n_clusters < 2 or self.n_clusters >= so_mau or self.n_clusters > so_diem_duy_nhat:
+        unique_points_count = len(np.unique(matrix, axis=0))
+        if self.n_clusters < 2 or self.n_clusters >= n_samples or self.n_clusters > unique_points_count:
             raise ValueError(
-                f"Số cụm K={self.n_clusters} không hợp lệ với {so_mau} mẫu "
-                f"({so_diem_duy_nhat} điểm phân biệt)."
+                f"Số cụm K={self.n_clusters} không hợp lệ với {n_samples} mẫu "
+                f"({unique_points_count} điểm phân biệt)."
             )
 
-        dist_matrix = cdist(ma_tran, ma_tran, metric=self._scipy_metric)
+        dist_matrix = cdist(matrix, matrix, metric=self._scipy_metric)
         medoids = self._build_initial_medoids(dist_matrix)
         labels = np.argmin(dist_matrix[:, medoids], axis=1)
 
         for _ in range(self.max_iter):
-            medoids_moi = medoids.copy()
-            for cum_id in range(self.n_clusters):
-                thanh_vien = np.where(labels == cum_id)[0]
-                if len(thanh_vien) == 0:
+            new_medoids = medoids.copy()
+            for cluster_id in range(self.n_clusters):
+                member_indices = np.where(labels == cluster_id)[0]
+                if len(member_indices) == 0:
                     continue
-                sub_dist = dist_matrix[np.ix_(thanh_vien, thanh_vien)]
-                chi_phi_noi_cum = sub_dist.sum(axis=1)
-                medoids_moi[cum_id] = thanh_vien[int(np.argmin(chi_phi_noi_cum))]
+                sub_dist = dist_matrix[np.ix_(member_indices, member_indices)]
+                intra_cluster_costs = sub_dist.sum(axis=1)
+                new_medoids[cluster_id] = member_indices[int(np.argmin(intra_cluster_costs))]
 
-            nhan_moi = np.argmin(dist_matrix[:, medoids_moi], axis=1)
-            if np.array_equal(medoids_moi, medoids) and np.array_equal(nhan_moi, labels):
+            new_labels = np.argmin(dist_matrix[:, new_medoids], axis=1)
+            if np.array_equal(new_medoids, medoids) and np.array_equal(new_labels, labels):
                 break
-            medoids = medoids_moi
-            labels = nhan_moi
+            medoids = new_medoids
+            labels = new_labels
 
         self.medoid_indices_ = medoids
-        self.cluster_centers_ = ma_tran[medoids].copy()
+        self.cluster_centers_ = matrix[medoids].copy()
         self.labels_ = labels
         self.total_cost_ = float(np.sum(np.min(dist_matrix[:, medoids], axis=1)))
         return self.labels_
 
-    def predict(self, ma_tran_moi: np.ndarray) -> np.ndarray:
+    def predict(self, new_matrix: np.ndarray) -> np.ndarray:
         """Gán nhãn cụm cho dữ liệu mới dựa trên Medoid gần nhất."""
         if self.cluster_centers_ is None:
             raise RuntimeError("KMedoidsTrainer chưa được huấn luyện. Hãy gọi fit_predict() trước.")
-        khoang_cach = cdist(np.asarray(ma_tran_moi, dtype=np.float64), self.cluster_centers_, metric=self._scipy_metric)
-        return np.argmin(khoang_cach, axis=1)
+        distances = cdist(np.asarray(new_matrix, dtype=np.float64), self.cluster_centers_, metric=self._scipy_metric)
+        return np.argmin(distances, axis=1)
 
     def search_optimal_k(
         self,
-        X: np.ndarray,
+        feature_matrix: np.ndarray,
         k_range: Iterable[int] = K_SEARCH_RANGE,
     ) -> pd.DataFrame:
         """
         Quét số cụm K với K-Medoids để ghi nhận tổng chi phí khoảng cách và Silhouette Score.
         """
-        ma_tran = np.asarray(X, dtype=np.float64)
-        if ma_tran.ndim != 2 or not np.all(np.isfinite(ma_tran)):
+        matrix = np.asarray(feature_matrix, dtype=np.float64)
+        if matrix.ndim != 2 or not np.all(np.isfinite(matrix)):
             raise ValueError("Ma trận đầu vào search_optimal_k phải là mảng 2D hữu hạn.")
-        so_diem_duy_nhat = len(np.unique(ma_tran, axis=0))
-        ket_qua = []
+        unique_points_count = len(np.unique(matrix, axis=0))
+        search_rows = []
         for k in k_range:
-            if k < 2 or k >= len(ma_tran) or k > so_diem_duy_nhat:
+            if k < 2 or k >= len(matrix) or k > unique_points_count:
                 continue
             trainer_k = KMedoidsTrainer(
                 n_clusters=k,
@@ -152,23 +152,23 @@ class KMedoidsTrainer:
                 max_iter=self.max_iter,
                 random_state=self.random_state,
             )
-            nhan = trainer_k.fit_predict(ma_tran)
-            chi_so = evaluate_clustering(ma_tran, nhan, model_name=f"KMedoids_K{k}", compute_dunn=False)
-            ket_qua.append(
+            labels = trainer_k.fit_predict(matrix)
+            metrics = evaluate_clustering(matrix, labels, model_name=f"KMedoids_K{k}", compute_dunn=False)
+            search_rows.append(
                 {
                     "K": int(k),
                     "Total_Cost": round(float(trainer_k.total_cost_), 4),
-                    "Silhouette": chi_so["silhouette"],
-                    "Davies_Bouldin": chi_so["davies_bouldin"],
-                    "Calinski_Harabasz": chi_so["calinski_harabasz"],
+                    "Silhouette": metrics["silhouette"],
+                    "Davies_Bouldin": metrics["davies_bouldin"],
+                    "Calinski_Harabasz": metrics["calinski_harabasz"],
                 }
             )
 
-        bang = pd.DataFrame(ket_qua)
-        if not bang.empty:
-            tot_nhat = bang.loc[bang["Silhouette"].idxmax()]
+        search_df = pd.DataFrame(search_rows)
+        if not search_df.empty:
+            best_row = search_df.loc[search_df["Silhouette"].idxmax()]
             print(
-                f" [QUÉT K-MEDOIDS] K tối ưu = {int(tot_nhat['K'])} "
-                f"(Silhouette = {tot_nhat['Silhouette']:.4f}, Cost = {tot_nhat['Total_Cost']:,.2f})"
+                f" [QUÉT K-MEDOIDS] K tối ưu = {int(best_row['K'])} "
+                f"(Silhouette = {best_row['Silhouette']:.4f}, Cost = {best_row['Total_Cost']:,.2f})"
             )
-        return bang
+        return search_df

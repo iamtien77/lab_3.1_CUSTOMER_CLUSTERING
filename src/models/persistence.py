@@ -26,18 +26,18 @@ def save_model(
     """
     Đóng gói model, scaler và metadata thành file .pkl bằng joblib.
     """
-    thu_muc = Path(output_dir) if output_dir is not None else SAVED_MODELS_DIR
-    thu_muc.mkdir(parents=True, exist_ok=True)
-    duong_dan = thu_muc / model_name
+    target_dir = Path(output_dir) if output_dir is not None else SAVED_MODELS_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+    model_path = target_dir / model_name
 
-    goi_mo_hinh = {
+    model_bundle = {
         "model": model_object,
         "scaler": scaler_object,
         "metadata": metadata or {},
     }
-    joblib.dump(goi_mo_hinh, duong_dan)
-    print(f" [ĐÃ LƯU MÔ HÌNH] Gói pipeline phân cụm đã lưu tại: {duong_dan}")
-    return duong_dan
+    joblib.dump(model_bundle, model_path)
+    print(f" [ĐÃ LƯU MÔ HÌNH] Gói pipeline phân cụm đã lưu tại: {model_path}")
+    return model_path
 
 
 def load_model(
@@ -47,14 +47,14 @@ def load_model(
     """
     Kiểm tra sự tồn tại và nạp gói mô hình ('model', 'scaler', 'metadata') từ ổ đĩa.
     """
-    thu_muc = Path(input_dir) if input_dir is not None else SAVED_MODELS_DIR
-    duong_dan = thu_muc / model_name
-    if not duong_dan.exists():
-        raise FileNotFoundError(f"Không tìm thấy tệp mô hình đã lưu tại: {duong_dan}")
+    target_dir = Path(input_dir) if input_dir is not None else SAVED_MODELS_DIR
+    model_path = target_dir / model_name
+    if not model_path.exists():
+        raise FileNotFoundError(f"Không tìm thấy tệp mô hình đã lưu tại: {model_path}")
 
-    goi_mo_hinh = joblib.load(duong_dan)
-    if not isinstance(goi_mo_hinh, dict) or not {"model", "scaler", "metadata"}.issubset(goi_mo_hinh.keys()):
-        raise ValueError(f"Tệp '{duong_dan}' không đúng cấu trúc gói pipeline mong đợi.")
+    model_bundle = joblib.load(model_path)
+    if not isinstance(model_bundle, dict) or not {"model", "scaler", "metadata"}.issubset(model_bundle.keys()):
+        raise ValueError(f"Tệp '{model_path}' không đúng cấu trúc gói pipeline mong đợi.")
 
-    print(f" [ĐÃ NẠP MÔ HÌNH] Tải thành công gói pipeline từ: {duong_dan.name}")
-    return goi_mo_hinh
+    print(f" [ĐÃ NẠP MÔ HÌNH] Tải thành công gói pipeline từ: {model_path.name}")
+    return model_bundle

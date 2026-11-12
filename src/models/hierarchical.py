@@ -32,37 +32,37 @@ class HierarchicalTrainer:
         """
         Khởi tạo phương pháp liên kết ('ward', 'complete', 'average', 'single') và khoảng cách.
         """
-        phuong_phap = linkage_method.lower().strip()
-        if phuong_phap not in _LINKAGE_METHODS:
+        normalized_method = linkage_method.lower().strip()
+        if normalized_method not in _LINKAGE_METHODS:
             raise ValueError(f"Phương pháp linkage '{linkage_method}' không hợp lệ. Chọn từ {sorted(_LINKAGE_METHODS)}.")
-        if phuong_phap == "ward" and metric != "euclidean":
+        if normalized_method == "ward" and metric != "euclidean":
             raise ValueError("Phương pháp 'ward' bắt buộc sử dụng khoảng cách 'euclidean'.")
 
-        self.linkage_method = phuong_phap
+        self.linkage_method = normalized_method
         self.metric = metric
         self.linkage_matrix_: Optional[np.ndarray] = None
         self.cophenetic_corr_: Optional[float] = None
         self.model: Optional[AgglomerativeClustering] = None
         self.labels_: Optional[np.ndarray] = None
 
-    def compute_linkage_matrix(self, X: np.ndarray) -> np.ndarray:
+    def compute_linkage_matrix(self, feature_matrix: np.ndarray) -> np.ndarray:
         """
         Tính ma trận liên kết phân cấp bằng SciPy và đo hệ số tương quan Cophenetic.
         """
-        ma_tran = np.asarray(X, dtype=np.float64)
-        if len(ma_tran) < 2:
+        matrix = np.asarray(feature_matrix, dtype=np.float64)
+        if len(matrix) < 2:
             raise ValueError("Cần ít nhất 2 mẫu dữ liệu để dựng cây phân cấp.")
 
-        ma_tran_lien_ket = linkage(ma_tran, method=self.linkage_method, metric=self.metric)
-        tuong_quan_coph, _ = cophenet(ma_tran_lien_ket, pdist(ma_tran, metric=self.metric))
+        linkage_matrix = linkage(matrix, method=self.linkage_method, metric=self.metric)
+        cophenetic_corr, _ = cophenet(linkage_matrix, pdist(matrix, metric=self.metric))
 
-        self.linkage_matrix_ = ma_tran_lien_ket
-        self.cophenetic_corr_ = float(tuong_quan_coph)
+        self.linkage_matrix_ = linkage_matrix
+        self.cophenetic_corr_ = float(cophenetic_corr)
         print(
             f" [CÂY PHÂN CẤP - {self.linkage_method.upper()}] "
             f"Hệ số tương quan Cophenetic = {self.cophenetic_corr_:.4f}"
         )
-        return ma_tran_lien_ket
+        return linkage_matrix
 
     def compute_cut_threshold(self, n_clusters: int) -> float:
         """
@@ -70,55 +70,55 @@ class HierarchicalTrainer:
         """
         if self.linkage_matrix_ is None:
             raise RuntimeError("Cần gọi compute_linkage_matrix() trước khi tính ngưỡng cắt.")
-        so_buoc = len(self.linkage_matrix_)
-        if n_clusters < 2 or n_clusters > so_buoc:
+        n_merges = len(self.linkage_matrix_)
+        if n_clusters < 2 or n_clusters > n_merges:
             raise ValueError(f"Số cụm n_clusters={n_clusters} không hợp lệ cho ma trận liên kết.")
         return float((self.linkage_matrix_[-n_clusters, 2] + self.linkage_matrix_[-(n_clusters - 1), 2]) / 2.0)
 
     def search_optimal_k(
         self,
-        X: np.ndarray,
+        feature_matrix: np.ndarray,
         k_range: Iterable[int] = K_SEARCH_RANGE,
     ) -> pd.DataFrame:
         """
         Quét số cụm K với AgglomerativeClustering để đối chiếu chất lượng phân tách (không dùng Inertia).
         """
-        ma_tran = np.asarray(X, dtype=np.float64)
-        danh_sach = []
+        matrix = np.asarray(feature_matrix, dtype=np.float64)
+        search_rows = []
         for k in k_range:
-            if k < 2 or k >= len(ma_tran):
+            if k < 2 or k >= len(matrix):
                 continue
-            model = self.fit_model(ma_tran, n_clusters=k)
-            chi_so = evaluate_clustering(
-                ma_tran,
+            model = self.fit_model(matrix, n_clusters=k)
+            metrics = evaluate_clustering(
+                matrix,
                 model.labels_,
                 model_name=f"Hierarchical_{self.linkage_method}_K{k}",
                 compute_dunn=False,
             )
-            danh_sach.append(
+            search_rows.append(
                 {
                     "K": int(k),
-                    "Silhouette": chi_so["silhouette"],
-                    "Davies_Bouldin": chi_so["davies_bouldin"],
-                    "Calinski_Harabasz": chi_so["calinski_harabasz"],
+                    "Silhouette": metrics["silhouette"],
+                    "Davies_Bouldin": metrics["davies_bouldin"],
+                    "Calinski_Harabasz": metrics["calinski_harabasz"],
                 }
             )
-        return pd.DataFrame(danh_sach)
+        return pd.DataFrame(search_rows)
 
-    def fit_model(self, X: np.ndarray, n_clusters: int = 3) -> AgglomerativeClustering:
+    def fit_model(self, feature_matrix: np.ndarray, n_clusters: int = 3) -> AgglomerativeClustering:
         """
         Huấn luyện mô hình AgglomerativeClustering với số cụm n_clusters chỉ định.
         """
-        ma_tran = np.asarray(X, dtype=np.float64)
-        if n_clusters < 2 or n_clusters >= len(ma_tran):
-            raise ValueError(f"Số cụm K={n_clusters} không hợp lệ với tập có {len(ma_tran)} mẫu.")
+        matrix = np.asarray(feature_matrix, dtype=np.float64)
+        if n_clusters < 2 or n_clusters >= len(matrix):
+            raise ValueError(f"Số cụm K={n_clusters} không hợp lệ với tập có {len(matrix)} mẫu.")
 
         self.model = AgglomerativeClustering(
             n_clusters=n_clusters,
             linkage=self.linkage_method,
             metric=self.metric,
         )
-        self.labels_ = self.model.fit_predict(ma_tran)
+        self.labels_ = self.model.fit_predict(matrix)
         print(
             f" [PHÂN CỤM PHÂN CẤP] Hoàn tất Agglomerative (linkage='{self.linkage_method}', K={n_clusters})."
         )
