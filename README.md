@@ -1,8 +1,8 @@
-﻿# DỰ ÁN: PHÂN CỤM KHÁCH HÀNG (CUSTOMER CLUSTERING)
+# DỰ ÁN: PHÂN CỤM KHÁCH HÀNG (CUSTOMER CLUSTERING)
 
-Dự án Machine Learning phân cụm khách hàng bán lẻ (Retail Customer Segmentation) dựa trên thông tin nhân khẩu học và hành vi tiêu dùng (`Age`, `Gender`, `Annual Income`, `Spending Score`) theo yêu cầu của **Practice Exercise 3**.
+Dự án Machine Learning phân cụm khách hàng bán lẻ (Retail Customer Segmentation) dựa trên thông tin nhân khẩu học và hành vi tiêu dùng (`Age`, `Income`, `Total_Spending` trích xuất từ `marketing_campaign.csv`) theo yêu cầu của **Practice Exercise 3**.
 
-**Trạng thái hiện tại:** dự án đang ở giai đoạn xây dựng khung; nhiều hàm còn `pass`. Các chức năng bên dưới mô tả trách nhiệm và hướng triển khai, chưa phải kết quả đã hoàn thành.
+**Trạng thái hiện tại:** Đã hoàn thiện triển khai pipeline đầy đủ ở phạm vi bài lab học tập (nạp & làm sạch 80/20, chuẩn hóa đặc trưng chống rò rỉ dữ liệu, 4 thuật toán phân cụm với K-Means Baseline, đánh giá định lượng, trực quan hóa, profiling động, kiểm thử `unittest` và báo cáo thực nghiệm tại `docs/reports/report.md`).
 
 ---
 
@@ -15,8 +15,8 @@ lab_3.1_CUSTOMER_CLUSTERING/
 ├── .venv/                          # Môi trường ảo Python cục bộ
 ├── data/
 │   ├── raw/
-│   │   └── Mall_Customers.csv       # Dữ liệu khách hàng thô
-│   └── processed/                  # Dữ liệu sau tiền xử lý
+│   │   └── marketing_campaign.csv   # Dữ liệu khách hàng gốc (TSV, 2.240 dòng x 29 cột)
+│   └── processed/                  # Dữ liệu sau tiền xử lý (train.csv, test.csv, full_customers.csv)
 ├── docs/
 │   ├── Algrothirms/                 # Thư mục tài liệu thuật toán
 │   ├── description_working_with_AI/ # Thư mục tài liệu làm việc với AI
@@ -85,8 +85,8 @@ Xem [bảng đối chiếu yêu cầu](docs/requirements_mapping.md) để biế
 
 - **Kiểm tra thiếu dữ liệu (Missing Values):** thống kê số lượng và tỷ lệ thiếu theo cột, đề xuất cách xử lý.
 - **Phát hiện ngoại lai (Outliers):** có thể sử dụng Boxplots và khoảng tứ phân vị (IQR); đánh giá trước khi quyết định giữ hoặc loại bỏ mẫu.
-- **Phân tích phân phối (Distributions):** vẽ Histograms cho `Age`, `Annual Income`, `Spending Score`; có thể bổ sung KDE và biểu đồ phân bố giới tính.
-- **Quan sát quan hệ giữa các đặc trưng:** vẽ Scatter Plots, chẳng hạn Income–Spending hoặc Age–Spending, để tìm dấu hiệu phân nhóm; không kết luận trước số cụm.
+- **Phân tích phân phối (Distributions):** vẽ Histograms và KDE/Boxplot cho `Age` (`2014 - Year_Birth`), `Income` và `Total_Spending` (`sum` 6 cột `Mnt*`); có thể bổ sung thống kê nhân khẩu học thật (`Education`, `Marital_Status`).
+- **Quan sát quan hệ giữa các đặc trưng:** vẽ Scatter Plots giữa `Income–Total_Spending` và `Age–Total_Spending`, kèm ma trận tương quan để quan sát cấu trúc phân nhóm; không ấn định trước số cụm.
 
 Với phương pháp IQR, ngưỡng phát hiện ngoại lai thường dùng là:
 
@@ -98,17 +98,15 @@ $$
 
 ### Bước 2: Chuẩn Hóa Đặc Trưng (Feature Scaling)
 
-**Mục tiêu:** đưa `Age`, `Annual Income` và `Spending Score` về thang đo tương đương để hạn chế ảnh hưởng của khác biệt đơn vị và độ phân tán lên khoảng cách.
+**Mục tiêu:** đưa 3 đặc trưng số `Age`, `Income` và `Total_Spending` về thang đo tương đương để hạn chế ảnh hưởng của khác biệt đơn vị và độ phân tán lên khoảng cách phân cụm.
 
 Các phương án triển khai:
 
-- **StandardScaler:** chuẩn hóa theo trung bình và độ lệch chuẩn; với biến không hằng, dữ liệu dùng để fit có trung bình xấp xỉ 0 và phương sai 1.
-- **MinMaxScaler:** đưa các giá trị của dữ liệu dùng để fit về khoảng `[0, 1]`.
+- **StandardScaler (mặc định chính):** chuẩn hóa theo trung bình và độ lệch chuẩn; với biến không hằng, dữ liệu dùng để fit có trung bình xấp xỉ 0 và phương sai 1.
+- **MinMaxScaler (đối chiếu):** đưa các giá trị của dữ liệu dùng để fit về khoảng `[0, 1]`.
 - **RobustScaler — mở rộng:** sử dụng median và IQR để giảm ảnh hưởng của giá trị ngoại lai lên tham số chuẩn hóa.
 
-`CustomerID` chỉ dùng định danh. Nếu đưa `Gender` vào phân cụm, cần giải thích cách mã hóa và ảnh hưởng tới khoảng cách; đề chỉ nêu yêu cầu scaling ba biến số.
-
-Chia train/test là lựa chọn mở rộng, không bắt buộc theo đề. Nếu sử dụng holdout, chỉ `fit` scaler trên train và `transform` test bằng scaler đã học.
+`ID` chỉ dùng làm khóa định danh và loại khỏi vector phân cụm. Chia cố định 80% Train / 20% Holdout Test (`RANDOM_SEED=42`): chỉ tính trung vị điền khuyết `Income` và `fit` scaler trên tập Train, sau đó `transform` tập Train và tập Test để chống Data Leakage.
 
 **Nơi thực hiện:** `notebooks/02_preprocessing_and_scaling.ipynb` và `src/features/scaling.py`.
 
@@ -119,7 +117,7 @@ Chia train/test là lựa chọn mở rộng, không bắt buộc theo đề. N�
 1. **K-Means:** có thể dùng làm baseline; khảo sát số cụm, chẳng hạn $K = 2, \ldots, 10$, kết hợp Elbow và Silhouette để chọn cấu hình phù hợp. Không mặc định $K=5$.
 2. **Hierarchical Clustering (Agglomerative):** thử số cụm và các kiểu linkage như `ward`, `complete`, `average`; sử dụng Dendrogram để quan sát cấu trúc phân cấp.
 3. **DBSCAN:** khảo sát `eps` và `min_samples`; có thể dùng đồ thị khoảng cách k-NN để hỗ trợ chọn `eps`. Ghi nhận riêng các điểm nhiễu có nhãn `-1`.
-4. **K-Medoids (PAM):** chọn mẫu dữ liệu thật làm tâm đại diện; có thể dùng để so sánh với K-Means về chất lượng cụm và ảnh hưởng của ngoại lai.
+4. **K-Medoids (BUILD tất định & cập nhật nội cụm):** chọn mẫu dữ liệu thật làm tâm đại diện; có thể dùng để so sánh với K-Means về chất lượng cụm và ảnh hưởng của ngoại lai.
 
 Mỗi thử nghiệm cần ghi thuật toán, tập đặc trưng, scaler, tham số, seed nếu có và chỉ số đánh giá. Kết luận dựa trên kết quả thực tế.
 
@@ -173,23 +171,20 @@ python -m pip install -r requirements.txt
 
 ### Làm việc với notebook
 
-Mở các notebook theo thứ tự `01` → `04` trong IDE có hỗ trợ Jupyter và chọn kernel của `.venv`. Các notebook và module hiện có là khung để tiếp tục triển khai.
+Mở các notebook theo thứ tự `01` → `04` trong IDE có hỗ trợ Jupyter và chọn kernel của `.venv`. Mỗi notebook có thể chạy nối tiếp nhau (`01` tạo dữ liệu sạch, `02` chuẩn hóa, `03` huấn luyện & lưu mô hình, `04` đánh giá & profiling).
 
-### Chạy pipeline sau khi hoàn thiện
-
-Lệnh dự kiến khi các hàm và phần điều phối đã được triển khai, kiểm tra:
+### Chạy toàn bộ pipeline, kiểm thử và CLI suy luận
 
 ```powershell
-python main.py
+.\.venv\Scripts\python.exe main.py
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m src.deployment.predictor --age 35 --income 75000 --spending 1400
 ```
 
-**Hiện tại pipeline chưa hoàn chỉnh**, nên lệnh trên chưa được coi là quy trình tạo kết quả thành công.
+Kết quả sinh ra được lưu tại:
 
-Kết quả dự kiến được tổ chức tại:
-
-- `results/figures/`: biểu đồ phân tích và phân cụm.
-- `results/metrics/`: bảng tham số, điểm đánh giá và thống kê phân khúc.
-- `docs/reports/report.md`: báo cáo nhận xét và kết luận.
-- `results/saved_models/`: mô hình đã lưu nếu triển khai phần mở rộng.
-
-Lưu mô hình, dự đoán khách hàng mới và các chức năng trong `src/deployment/` không thuộc yêu cầu bắt buộc của đề. Các gợi ý cũ trong khung code như chọn sẵn K-Means, $K=5$ hoặc năm persona cần được kiểm chứng khi triển khai.
+- `data/processed/`: `train.csv`, `test.csv`, `full_customers.csv`.
+- `results/figures/`: các biểu đồ EDA, Elbow & Silhouette, Scatter 2D/3D, Dendrogram, Silhouette Knife Plot, DBSCAN k-NN.
+- `results/metrics/`: bảng kiểm toán dữ liệu, bảng quét tham số, `model_comparison.csv`, `holdout_test_evaluation.csv`, `cluster_profiles.csv`.
+- `results/saved_models/`: gói mô hình `final_kmeans_pipeline.pkl` kèm scaler, trung vị Train và định nghĩa Persona.
+- `docs/reports/report.md`: báo cáo tổng hợp số liệu thực nghiệm, thảo luận và kết luận.

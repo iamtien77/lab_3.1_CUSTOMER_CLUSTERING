@@ -13,8 +13,10 @@ Phạm vi gồm chuẩn hóa đặc trưng, baseline K-Means và phương án ph
 | [K-Means](kmeans_design.md) | Baseline phân cụm | Dự kiến; chờ dữ liệu phù hợp |
 | [Hierarchical Clustering](hierarchical_design.md) | Đối chiếu với baseline nếu đủ thời gian | Tùy chọn; thực hiện sau baseline |
 
-Status mô tả kế hoạch học tập, không xác nhận tình trạng triển khai hay chất lượng mô hình.
-DBSCAN và K-Medoids không thuộc danh sách dự kiến trong thiết kế tổng thể hiện tại.
+Status mô tả quá trình hoàn thiện của bài lab theo quyết định đã thống nhất:
+- Dùng nguồn nội bộ `data/raw/marketing_campaign.csv` (`sep="\t"`) với `Age = 2014 - Year_Birth`, `Income`, `Total_Spending = sum(6 cột Mnt*)`; không giả lập cột `Gender`.
+- Áp dụng quy trình chia `80% Train / 20% Holdout Test` trước bước điền khuyết/chuẩn hóa để chống rò rỉ dữ liệu.
+- Triển khai đầy đủ cả 4 thuật toán theo khung dự án (`K-Means` Baseline, `Hierarchical`, `DBSCAN`, `K-Medoids` PAM tự cài bằng NumPy/SciPy) trong phạm vi bài lab học tập.
 
 ## Data used - Điều kiện chung về dữ liệu
 
