@@ -11,16 +11,23 @@ Mục đích:
 
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from src.config import (
+    CAMPAIGN_BINARY_COLUMNS,
+    CONSTANT_RAW_COLUMNS,
     DATA_SEPARATOR,
     DEFAULT_DATA_PATH,
     ID_COLUMN,
     PROCESSED_DATA_DIR,
+    PURCHASE_COUNT_COLUMNS,
     RANDOM_SEED,
+    REFERENCE_YEAR,
     REQUIRED_RAW_COLUMNS,
+    SPENDING_COMPONENT_COLUMNS,
+    YEAR_BIRTH_COLUMN,
     TRAIN_TEST_SPLIT_RATIO,
 )
 
@@ -54,17 +61,23 @@ def load_raw_data(
         delimiter = sep if sep is not None else _detect_separator(resolved_path)
         df = pd.read_csv(resolved_path, sep=delimiter)
 
-    # Xóa khoảng trắng thừa ở tên cột để tránh lỗi truy xuất key
     df.columns = df.columns.astype(str).str.strip()
+    if "Dt_Customer" in df.columns:
+        df["Dt_Customer"] = pd.to_datetime(
+            df["Dt_Customer"], format="%d-%m-%Y", errors="raise"
+        )
     print(f" [NẠP DỮ LIỆU] Đã đọc thành công {len(df):,} dòng x {df.shape[1]} cột từ {resolved_path.name}")
     return df
 
 
 def validate_schema(df: pd.DataFrame, allow_duplicate_ids: bool = False) -> Dict[str, Any]:
     """
-    Kiểm tra cấu trúc cột bắt buộc, dòng trùng lặp, tính duy nhất của ID và giá trị thiếu.
+    Kiểm tra đủ schema 29 cột, ID, ngày, miền giá trị, cột hằng và Income thiếu.
     allow_duplicate_ids=True chỉ dùng trước bước loại trùng; vẫn chặn thiếu cột/ID.
     """
+    duplicate_columns = df.columns[df.columns.duplicated()].tolist()
+    if duplicate_columns:
+        raise ValueError(f"Tên cột bị trùng: {duplicate_columns}")
     missing_columns = [col for col in REQUIRED_RAW_COLUMNS if col not in df.columns]
     duplicate_rows = int(df.duplicated().sum())
     missing_ids = int(df[ID_COLUMN].isnull().sum()) if ID_COLUMN in df.columns else -1
@@ -77,10 +90,33 @@ def validate_schema(df: pd.DataFrame, allow_duplicate_ids: bool = False) -> Dict
     null_by_column = {
         col: int(count) for col, count in df.isnull().sum().items() if count > 0
     }
+    unexpected_columns = [col for col in df.columns if col not in REQUIRED_RAW_COLUMNS]
+    invalid_by_column = {}
+    constant_values = {}
+    if not missing_columns and len(df):
+        for column in [YEAR_BIRTH_COLUMN, *SPENDING_COMPONENT_COLUMNS, *PURCHASE_COUNT_COLUMNS]:
+            values = pd.to_numeric(df[column], errors="coerce")
+            in_range = values.between(1, REFERENCE_YEAR) if column == YEAR_BIRTH_COLUMN else values.ge(0)
+            invalid_by_column[column] = int((~(in_range & np.isfinite(values))).sum())
+        for column in CAMPAIGN_BINARY_COLUMNS:
+            invalid_by_column[column] = int((~df[column].isin([0, 1])).sum())
+        dates = pd.to_datetime(df["Dt_Customer"], format="%d-%m-%Y", errors="coerce")
+        invalid_by_column["Dt_Customer"] = int(dates.isna().sum())
+        income = pd.to_numeric(df["Income"], errors="coerce")
+        invalid_by_column["Income"] = int((df["Income"].notna() & (~np.isfinite(income) | income.lt(0))).sum())
+        for column in CONSTANT_RAW_COLUMNS:
+            if df[column].nunique(dropna=False) == 1 and pd.notna(df[column].iloc[0]):
+                constant_values[column] = df[column].iloc[:1].tolist()[0]
+            else:
+                invalid_by_column[column] = len(df)
+    invalid_by_column = {col: count for col, count in invalid_by_column.items() if count}
+    income_missing = null_by_column.get("Income", 0)
     total_nulls = int(sum(null_by_column.values()))
     is_valid = (
         len(missing_columns) == 0
-        and (allow_duplicate_ids or duplicate_ids == 0)
+        and not unexpected_columns
+        and not invalid_by_column
+        and (allow_duplicate_ids or (duplicate_ids == 0 and duplicate_rows == 0))
         and missing_ids == 0
         and len(df) > 0
     )
@@ -90,6 +126,10 @@ def validate_schema(df: pd.DataFrame, allow_duplicate_ids: bool = False) -> Dict
         "n_rows": int(df.shape[0]),
         "n_cols": int(df.shape[1]),
         "missing_columns": missing_columns,
+        "unexpected_columns": unexpected_columns,
+        "invalid_by_column": invalid_by_column,
+        "constant_values": constant_values,
+        "income_missing": income_missing,
         "duplicate_rows": duplicate_rows,
         "duplicate_ids": duplicate_ids,
         "missing_ids": missing_ids,
@@ -101,7 +141,7 @@ def validate_schema(df: pd.DataFrame, allow_duplicate_ids: bool = False) -> Dict
     print(
         f" [KIỂM ĐỊNH SCHEMA] Trạng thái: {status_label} | "
         f"Dòng: {validation_result['n_rows']:,} | Cột thiếu: {len(missing_columns)} | "
-        f"ID trùng: {duplicate_ids} | ID thiếu: {missing_ids} | Giá trị khuyết: {total_nulls}"
+        f"ID trùng: {duplicate_ids} | ID thiếu: {missing_ids} | Income thiếu: {income_missing}"
     )
     return validation_result
 

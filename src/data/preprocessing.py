@@ -4,13 +4,14 @@ MODULE: TIỀN XỬ LÝ DỮ LIỆU CƠ BẢN (DATA PREPROCESSING & CLEANING)
 =============================================================================
 Mục đích:
 - Tạo các đặc trưng cốt lõi từ marketing_campaign.csv (Age, Total_Spending).
-- Làm sạch dữ liệu cơ bản, lọc ngoại lai phi lý (năm sinh < 1920, thu nhập lỗi),
-  và điền giá trị thiếu (tránh Data Leakage khi truyền median từ tập Train).
+- Làm sạch dữ liệu và điền giá trị thiếu bằng trung vị từ tập Train khi xử lý Holdout.
+- Giữ giá trị đặc biệt hợp lệ theo mặc định khi gọi clean_data.
 - Kiểm tra chi tiết giá trị thiếu và giá trị ngoại lai bằng phương pháp IQR.
 =============================================================================
 """
 
 from typing import Dict, List, Optional
+import numpy as np
 import pandas as pd
 
 from src.config import (
@@ -42,8 +43,10 @@ def add_derived_features(
 
     if all(col in result_df.columns for col in SPENDING_COMPONENT_COLUMNS):
         for col in SPENDING_COMPONENT_COLUMNS:
-            result_df[col] = pd.to_numeric(result_df[col], errors="coerce").fillna(0.0)
-        result_df[SPENDING_COLUMN] = result_df[SPENDING_COMPONENT_COLUMNS].sum(axis=1)
+            result_df[col] = pd.to_numeric(result_df[col], errors="coerce")
+        result_df[SPENDING_COLUMN] = result_df[SPENDING_COMPONENT_COLUMNS].sum(
+            axis=1, min_count=len(SPENDING_COMPONENT_COLUMNS)
+        )
 
     return result_df
 
@@ -51,6 +54,7 @@ def add_derived_features(
 def filter_invalid_records(
     df: pd.DataFrame,
     preserve_index: bool = False,
+    drop_extreme_values: bool = True,
 ) -> pd.DataFrame:
     """
     Loại bỏ các bản ghi trùng ID hoặc mang giá trị sai lệch miền dữ liệu
@@ -65,20 +69,17 @@ def filter_invalid_records(
 
     if YEAR_BIRTH_COLUMN in result_df.columns:
         year_birth = pd.to_numeric(result_df[YEAR_BIRTH_COLUMN], errors="coerce")
-        result_df = result_df[
-            year_birth.isna()
-            | ((year_birth >= MIN_VALID_YEAR_BIRTH) & (year_birth <= REFERENCE_YEAR))
-        ]
+        min_birth = MIN_VALID_YEAR_BIRTH if drop_extreme_values else 1
+        result_df = result_df[year_birth.isna() | year_birth.between(min_birth, REFERENCE_YEAR)]
     elif AGE_COLUMN in result_df.columns:
         age = pd.to_numeric(result_df[AGE_COLUMN], errors="coerce")
-        max_valid_age = REFERENCE_YEAR - MIN_VALID_YEAR_BIRTH
+        max_valid_age = REFERENCE_YEAR - (MIN_VALID_YEAR_BIRTH if drop_extreme_values else 1)
         result_df = result_df[age.isna() | ((age > 0) & (age <= max_valid_age))]
 
     if INCOME_COLUMN in result_df.columns:
         income = pd.to_numeric(result_df[INCOME_COLUMN], errors="coerce")
-        valid_income_mask = income.isna() | (
-            (income >= 0) & (income <= MAX_VALID_INCOME)
-        )
+        max_income = MAX_VALID_INCOME if drop_extreme_values else np.inf
+        valid_income_mask = income.isna() | (np.isfinite(income) & income.between(0, max_income))
         result_df = result_df[valid_income_mask]
 
     for col in SPENDING_COMPONENT_COLUMNS:
@@ -103,13 +104,15 @@ def clean_data(
     drop_invalid_outliers: bool = True,
     derive_features: bool = True,
     preserve_index: bool = False,
+    drop_extreme_values: bool = False,
 ) -> pd.DataFrame:
     """
     Làm sạch dữ liệu: ép kiểu số, lọc bản ghi lỗi miền (nếu bật), tạo Age/Total_Spending và điền giá trị thiếu.
-    Khi chạy trên tập Test, cần truyền fill_medians tính từ tập Train để tránh Data Leakage.
+    Mặc định giữ các giá trị đặc biệt hợp lệ. Khi xử lý Holdout, truyền fill_medians
+    đã tính từ Train để dùng lại cùng giá trị điền khuyết.
     """
     result_df = (
-        filter_invalid_records(df, preserve_index=preserve_index)
+        filter_invalid_records(df, preserve_index=preserve_index, drop_extreme_values=drop_extreme_values)
         if drop_invalid_outliers
         else df.copy()
     )
@@ -125,12 +128,12 @@ def clean_data(
     for col in NUMERICAL_FEATURES:
         if col not in result_df.columns or not result_df[col].isnull().any():
             continue
-        fill_value = (
-            fill_medians[col]
-            if fill_medians is not None and col in fill_medians
-            else float(result_df[col].median())
-        )
-        if not pd.notna(fill_value):
+        if col == SPENDING_COLUMN and derive_features:
+            raise ValueError("Thiếu hoặc sai khoản chi thành phần, không thể tính đủ Total_Spending.")
+        if fill_medians is not None and col not in fill_medians:
+            raise ValueError(f"Thiếu trung vị tập Train cho cột '{col}'.")
+        fill_value = fill_medians[col] if fill_medians is not None else float(result_df[col].dropna().median())
+        if not np.isfinite(fill_value):
             raise ValueError(
                 f"Cột '{col}' chỉ chứa giá trị thiếu (NaN) và không có trung vị hợp lệ để điền."
             )

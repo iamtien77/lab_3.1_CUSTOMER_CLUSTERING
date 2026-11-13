@@ -45,9 +45,10 @@ DOCS_DIR = PROJECT_ROOT / "docs"
 NOTEBOOKS_DIR = PROJECT_ROOT / "notebooks"
 TESTS_DIR = PROJECT_ROOT / "tests"
 
-# Thư mục lưu đầu ra tách biệt dành riêng cho Jupyter Notebooks (không ghi đè kết quả của main.py)
+# Notebook dùng thư mục dữ liệu đã xử lý chung của dự án.
+# Biểu đồ, chỉ số và mô hình của notebook vẫn lưu trong notebooks/results.
 NOTEBOOK_RESULTS_DIR = NOTEBOOKS_DIR / "results"
-NOTEBOOK_PROCESSED_DIR = NOTEBOOK_RESULTS_DIR / "processed"
+NOTEBOOK_PROCESSED_DIR = PROCESSED_DATA_DIR
 NOTEBOOK_FIGURES_DIR = NOTEBOOK_RESULTS_DIR / "figures"
 NOTEBOOK_METRICS_DIR = NOTEBOOK_RESULTS_DIR / "metrics"
 NOTEBOOK_SAVED_MODELS_DIR = NOTEBOOK_RESULTS_DIR / "saved_models"
@@ -98,11 +99,20 @@ SPENDING_COMPONENT_COLUMNS = [
     "MntSweetProducts",
     "MntGoldProds",
 ]
+PURCHASE_COUNT_COLUMNS = [
+    "NumDealsPurchases", "NumWebPurchases", "NumCatalogPurchases",
+    "NumStorePurchases", "NumWebVisitsMonth",
+]
+CAMPAIGN_BINARY_COLUMNS = [
+    "AcceptedCmp3", "AcceptedCmp4", "AcceptedCmp5", "AcceptedCmp1",
+    "AcceptedCmp2", "Complain", "Response",
+]
+CONSTANT_RAW_COLUMNS = ["Z_CostContact", "Z_Revenue"]
 REQUIRED_RAW_COLUMNS = [
-    ID_COLUMN,
-    YEAR_BIRTH_COLUMN,
-    "Income",
-    *SPENDING_COMPONENT_COLUMNS,
+    ID_COLUMN, YEAR_BIRTH_COLUMN, "Education", "Marital_Status", "Income",
+    "Kidhome", "Teenhome", "Dt_Customer", "Recency",
+    *SPENDING_COMPONENT_COLUMNS, *PURCHASE_COUNT_COLUMNS,
+    *CAMPAIGN_BINARY_COLUMNS, *CONSTANT_RAW_COLUMNS,
 ]
 
 # Các cột phân loại nhân khẩu học phục vụ EDA / Profiling (không có Gender trong tập gốc)
@@ -114,7 +124,8 @@ INCOME_COLUMN = "Income"             # Thu nhập hộ gia đình hàng năm (US
 SPENDING_COLUMN = "Total_Spending"   # Tổng chi tiêu trên 6 nhóm sản phẩm Mnt*
 
 # Danh sách đầy đủ các đặc trưng số dùng để phân cụm
-NUMERICAL_FEATURES = [AGE_COLUMN, INCOME_COLUMN, SPENDING_COLUMN]
+FEATURE_COLS = [AGE_COLUMN, INCOME_COLUMN, SPENDING_COLUMN]
+NUMERICAL_FEATURES = FEATURE_COLS
 
 # Cặp đặc trưng 2D cốt lõi thể hiện rõ nhất phân khúc thu nhập - chi tiêu
 KEY_2D_FEATURES = [INCOME_COLUMN, SPENDING_COLUMN]

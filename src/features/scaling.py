@@ -21,7 +21,7 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 
-from src.config import ID_COLUMN, K_SEARCH_RANGE, NUMERICAL_FEATURES, RANDOM_SEED
+from src.config import FEATURE_COLS, ID_COLUMN, K_SEARCH_RANGE, NUMERICAL_FEATURES, RANDOM_SEED
 
 
 _SCALER_FACTORY = {
@@ -78,7 +78,7 @@ class FeatureScaler:
             )
 
         self.method = normalized_method
-        self.feature_cols = list(feature_cols) if feature_cols is not None else list(NUMERICAL_FEATURES)
+        self.feature_cols = list(feature_cols) if feature_cols is not None else list(FEATURE_COLS)
         if ID_COLUMN in self.feature_cols:
             raise ValueError(f"Không được đưa cột định danh '{ID_COLUMN}' vào danh sách đặc trưng cần chuẩn hóa.")
 

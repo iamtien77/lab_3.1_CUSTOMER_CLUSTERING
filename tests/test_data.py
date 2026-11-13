@@ -13,7 +13,7 @@ import pandas as pd
 
 from src.config import DEFAULT_DATA_PATH, ID_COLUMN, SPENDING_COMPONENT_COLUMNS
 from src.data.loader import load_raw_data, split_data, validate_schema
-from src.data.preprocessing import audit_missing_and_outliers, clean_data
+from src.data.preprocessing import audit_missing_and_outliers, clean_data, compute_train_medians
 
 
 def _build_sample_customer_row(
@@ -40,6 +40,20 @@ def _build_sample_customer_row(
         "MntFishProducts": 0,
         "MntSweetProducts": 0,
         "MntGoldProds": 0,
+        "NumDealsPurchases": 0,
+        "NumWebPurchases": 0,
+        "NumCatalogPurchases": 0,
+        "NumStorePurchases": 0,
+        "NumWebVisitsMonth": 0,
+        "AcceptedCmp1": 0,
+        "AcceptedCmp2": 0,
+        "AcceptedCmp3": 0,
+        "AcceptedCmp4": 0,
+        "AcceptedCmp5": 0,
+        "Complain": 0,
+        "Response": 0,
+        "Z_CostContact": 3,
+        "Z_Revenue": 11,
     }
     return record
 
@@ -80,8 +94,8 @@ class TestDataLoader(unittest.TestCase):
         self.assertFalse(dup_schema_result["is_valid"])
         self.assertEqual(dup_schema_result["duplicate_ids"], 1)
 
-    def test_clean_data_derives_features_filters_outliers_and_fills_nulls(self):
-        """Kiểm tra tạo Age=2014-Year_Birth, Total_Spending=sum(Mnt*), lọc bất hợp lý và điền median."""
+    def test_clean_data_derives_features_keeps_valid_extremes_and_fills_nulls(self):
+        """Kiểm tra công thức đặc trưng, giữ giá trị đặc biệt hợp lệ và điền trung vị."""
         mock_df = pd.DataFrame([
             _build_sample_customer_row(1, 1893, 60000.0, wine_spend=10, fruit_spend=10),   # Lỗi năm sinh < 1920
             _build_sample_customer_row(2, 1977, 666666.0, wine_spend=10, fruit_spend=10),  # Outlier thu nhập phi lý
@@ -90,13 +104,33 @@ class TestDataLoader(unittest.TestCase):
             _build_sample_customer_row(5, 1994, None, wine_spend=20, fruit_spend=5),       # Hợp lệ, thiếu Income -> median(30k, 50k)=40k
         ])
 
-        cleaned_df = clean_data(mock_df)
-        self.assertEqual(len(cleaned_df), 3)
-        self.assertListEqual(cleaned_df[ID_COLUMN].tolist(), [3, 4, 5])
+        mock_df.loc[2, ["MntMeatProducts", "MntFishProducts", "MntSweetProducts", "MntGoldProds"]] = [1, 2, 3, 4]
+        train_medians = compute_train_medians(mock_df.iloc[2:4])
+        cleaned_df = clean_data(mock_df, fill_medians=train_medians)
+        self.assertListEqual(cleaned_df[ID_COLUMN].tolist(), [1, 2, 3, 4, 5])
+        self.assertEqual(cleaned_df.loc[0, "Age"], 121)
+        self.assertEqual(cleaned_df.loc[1, "Income"], 666666.0)
         self.assertEqual(cleaned_df.loc[cleaned_df[ID_COLUMN] == 3, "Age"].iloc[0], 30)
-        self.assertEqual(cleaned_df.loc[cleaned_df[ID_COLUMN] == 3, "Total_Spending"].iloc[0], 150)
+        self.assertEqual(cleaned_df.loc[cleaned_df[ID_COLUMN] == 3, "Total_Spending"].iloc[0], 160)
         self.assertAlmostEqual(cleaned_df.loc[cleaned_df[ID_COLUMN] == 5, "Income"].iloc[0], 40000.0)
         self.assertEqual(int(cleaned_df[["Age", "Income", "Total_Spending"]].isnull().sum().sum()), 0)
+
+    def test_schema_checks_dates_domains_and_constant_columns(self):
+        rows = [_build_sample_customer_row(i, 1980, 40000.0) for i in (1, 2)]
+        rows[1].update(Dt_Customer="31-02-2014", AcceptedCmp1=2,
+                       NumWebPurchases=-1, Z_Revenue=12)
+        report = validate_schema(pd.DataFrame(rows))
+        self.assertFalse(report["is_valid"])
+        self.assertEqual(report["invalid_by_column"], {
+            "Dt_Customer": 1, "AcceptedCmp1": 1, "NumWebPurchases": 1, "Z_Revenue": 2,
+        })
+        self.assertEqual(report["constant_values"], {"Z_CostContact": 3})
+
+    def test_missing_spending_is_not_counted_as_zero(self):
+        row = _build_sample_customer_row(1, 1980, 40000.0)
+        row["MntFishProducts"] = None
+        with self.assertRaisesRegex(ValueError, "Total_Spending"):
+            clean_data(pd.DataFrame([row]))
 
     def test_audit_missing_and_outliers_worked_example(self):
         """Kiểm tra tính toán Q1, Q3, IQR và đếm outlier khớp giá trị tính tay."""
